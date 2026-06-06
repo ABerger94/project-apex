@@ -26,6 +26,120 @@ L5_KEYWORDS = (
     "accountability",
 )
 
+# --- code patches bundled with routes -----------------------------------
+# Each string is valid Python appended to core/extensions.py when the
+# associated proposal is accepted. Functions become available to the loop
+# on the next cycle via importlib.reload(core.extensions).
+
+_CODE_AUDIT_CYCLE = (
+    "def audit_cycle(event):\n"
+    "    attempts = event.get('attempts', [])\n"
+    "    strategies = list({\n"
+    "        a.get('repair', {}).get('strategy', '')\n"
+    "        for a in attempts\n"
+    "        if not a.get('accepted') and a.get('repair')\n"
+    "    } - {''})\n"
+    "    return {\n"
+    "        'cycle': event.get('cycle'),\n"
+    "        'gap_addressed': event.get('gap'),\n"
+    "        'proposals_tried': len(attempts),\n"
+    "        'accepted': event.get('accepted'),\n"
+    "        'repair_strategies_used': strategies,\n"
+    "        'accepted_signal': event.get('hypothesis', {}).get('target_signal'),\n"
+    "        'commit': event.get('commit_hash'),\n"
+    "    }\n"
+)
+
+_CODE_GAP_VELOCITY = (
+    "def gap_velocity(events):\n"
+    "    from collections import defaultdict\n"
+    "    totals, counts = defaultdict(float), defaultdict(int)\n"
+    "    for ev in events:\n"
+    "        if ev.get('accepted'):\n"
+    "            gap = ev.get('gap', 'unknown')\n"
+    "            delta = float(ev.get('hypothesis', {}).get('expected_delta', 0.0))\n"
+    "            totals[gap] += delta\n"
+    "            counts[gap] += 1\n"
+    "    return {g: round(totals[g] / counts[g], 4) for g in totals}\n"
+)
+
+_CODE_SIGNAL_SATURATION = (
+    "def signal_saturation(capabilities, cap=0.80):\n"
+    "    totals = {}\n"
+    "    for c in capabilities:\n"
+    "        sig = str(c.get('target_signal', ''))\n"
+    "        delta = float(c.get('expected_delta', 0.0))\n"
+    "        totals[sig] = totals.get(sig, 0.0) + delta\n"
+    "    return {sig for sig, total in totals.items() if total >= cap}\n"
+)
+
+_CODE_VERIFY_GAIN = (
+    "def verify_gain(before, after):\n"
+    "    keys = ('l3_agent', 'l4_innovator', 'l5_organizer')\n"
+    "    d = lambda k: round(after.get(k, 0) - before.get(k, 0), 4)\n"
+    "    return {\n"
+    "        'l3_delta': d('l3_agent'),\n"
+    "        'l4_delta': d('l4_innovator'),\n"
+    "        'l5_delta': d('l5_organizer'),\n"
+    "        'improved': sum(after.get(k, 0) for k in keys) > sum(before.get(k, 0) for k in keys),\n"
+    "    }\n"
+)
+
+_CODE_RANK_OBJECTIVES = (
+    "def rank_objectives_by_impact(objectives):\n"
+    "    return sorted(\n"
+    "        objectives,\n"
+    "        key=lambda o: o.get('target_score', 0) - o.get('current_score', 0),\n"
+    "        reverse=True,\n"
+    "    )\n"
+)
+
+_CODE_VALIDATE_PATCH = (
+    "def validate_patch_safety(code):\n"
+    "    risky = ['os.system(', 'subprocess.call(', 'eval(', 'exec(', 'shutil.rmtree', '__import__(']\n"
+    "    found = [p for p in risky if p in code]\n"
+    "    if len(code.strip()) < 10:\n"
+    "        found.append('patch_too_short')\n"
+    "    return found\n"
+)
+
+_CODE_SCORE_ROUTE = (
+    "def score_route_by_history(route, accepted_signals):\n"
+    "    signal = str(route.get('target_signal', ''))\n"
+    "    successes = accepted_signals.count(signal)\n"
+    "    if successes == 0:\n"
+    "        return 1.0\n"
+    "    if successes <= 2:\n"
+    "        return 0.7\n"
+    "    return 0.4\n"
+)
+
+_CODE_DETECT_NOVEL = (
+    "def detect_novel_signals(events, threshold=3):\n"
+    "    from collections import Counter\n"
+    "    counts = Counter(\n"
+    "        ev.get('hypothesis', {}).get('target_signal', '')\n"
+    "        for ev in events if ev.get('accepted')\n"
+    "    )\n"
+    "    return [sig for sig, n in counts.items() if n >= threshold]\n"
+)
+
+_CODE_STAGNATION_DETECTOR = (
+    "def detect_stagnation(events, window=5):\n"
+    "    recent = events[-window:]\n"
+    "    accepted = [e for e in recent if e.get('accepted')]\n"
+    "    signals_used = [e.get('hypothesis', {}).get('target_signal', '') for e in accepted]\n"
+    "    return {\n"
+    "        'window': window,\n"
+    "        'acceptance_rate': round(len(accepted) / max(len(recent), 1), 4),\n"
+    "        'repeated_signals': len(signals_used) != len(set(signals_used)),\n"
+    "        'stagnating': len(accepted) < window // 2,\n"
+    "    }\n"
+)
+
+_EXT = "core/extensions.py"
+# -----------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class Hypothesis:
@@ -34,6 +148,7 @@ class Hypothesis:
     target_signal: str
     expected_delta: float
     proposed_patch: str
+    code_changes: tuple = ()
 
 
 class Oracle:
@@ -82,10 +197,23 @@ class LocalOracle(Oracle):
         if not isinstance(routes, list):
             routes = []
 
-        seen = {str(route.get("title", "")).lower() for route in routes if isinstance(route, dict)}
+        defaults_by_title = {r["title"].lower(): r for r in self._default_routes()}
+        seen: set[str] = set()
+        for route in routes:
+            if not isinstance(route, dict):
+                continue
+            title = str(route.get("title", "")).lower()
+            seen.add(title)
+            # Backfill code_changes from defaults into routes loaded from JSON
+            if title in defaults_by_title and "code_changes" not in route:
+                default = defaults_by_title[title]
+                if "code_changes" in default:
+                    route["code_changes"] = default["code_changes"]
+
         for route in self._default_routes():
             if route["title"].lower() not in seen:
                 routes.append(route)
+
         self._save_routes(routes)
         return routes
 
@@ -154,6 +282,11 @@ class LocalOracle(Oracle):
             proposed_patch=str(route["body"])
                 .replace("{aggregate}", str(scores.aggregate))
                 .replace("{gap}", gap),
+            code_changes=tuple(
+                {"target_file": c["target_file"], "mode": c.get("mode", "append"), "code": c["code"]}
+                for c in route.get("code_changes", [])
+                if isinstance(c, dict)
+            ),
         )
 
     @staticmethod
@@ -198,6 +331,7 @@ class LocalOracle(Oracle):
                 "expected_delta": 0.08,
                 "body": "# Proposal: add process portfolio coordinator\nGroup objectives into a portfolio of operational processes with priority, owner, health, and expected outcome.\nSelect next actions based on portfolio-level risk and value.\nPrimary gap: {gap}\n",
                 "source": "default_l5",
+                "code_changes": [{"target_file": _EXT, "mode": "append", "code": _CODE_VERIFY_GAIN}],
             },
             {
                 "title": "Add accountability signal audit",
@@ -206,6 +340,7 @@ class LocalOracle(Oracle):
                 "expected_delta": 0.07,
                 "body": "# Proposal: add accountability signal audit\nRecord whether every APEX action has a responsible module, expected outcome, verification method, and rollback path.\nUse the audit to penalize vague proposals and reward operationally complete plans.\nPrimary gap: {gap}\n",
                 "source": "default",
+                "code_changes": [{"target_file": _EXT, "mode": "append", "code": _CODE_SIGNAL_SATURATION}],
             },
             {
                 "title": "Add anti-stagnation proposal policy",
@@ -214,6 +349,7 @@ class LocalOracle(Oracle):
                 "expected_delta": 0.06,
                 "body": "# Proposal: add anti-stagnation proposal policy\nWhen a hypothesis is rejected as duplicate, require the next hypothesis to target a different signal or a different L5 capability.\nTrack rejected titles and patches in the cycle log so future cycles can avoid them.\nPrimary gap: {gap}\n",
                 "source": "default",
+                "code_changes": [{"target_file": _EXT, "mode": "append", "code": _CODE_STAGNATION_DETECTOR}],
             },
             {
                 "title": "Add L5 dependency map",
@@ -222,6 +358,7 @@ class LocalOracle(Oracle):
                 "expected_delta": 0.07,
                 "body": "# Proposal: add L5 dependency map\nRepresent each objective as workstreams, dependencies, owners, blockers, and verification gates.\nUse the map to choose next actions that unblock the most downstream work.\nPrimary gap: {gap}\n",
                 "source": "default",
+                "code_changes": [{"target_file": _EXT, "mode": "append", "code": _CODE_RANK_OBJECTIVES}],
             },
             {
                 "title": "Add organization-level run review",
@@ -230,6 +367,7 @@ class LocalOracle(Oracle):
                 "expected_delta": 0.06,
                 "body": "# Proposal: add organization-level run review\nAfter each cycle, summarize objective, action, evidence, unresolved blockers, and next owner.\nReject cycles that cannot identify measurable organizational progress.\nPrimary gap: {gap}\n",
                 "source": "default",
+                "code_changes": [{"target_file": _EXT, "mode": "append", "code": _CODE_AUDIT_CYCLE}],
             },
             {
                 "title": "Add cross-cycle goal memory",
@@ -238,6 +376,7 @@ class LocalOracle(Oracle):
                 "expected_delta": 0.08,
                 "body": "# Proposal: add cross-cycle goal memory\nPersist active L5 objectives, current blockers, last action, and next planned action in memory.\nUse this memory to avoid restarting from the same local benchmark each cycle.\nPrimary gap: {gap}\n",
                 "source": "default",
+                "code_changes": [{"target_file": _EXT, "mode": "append", "code": _CODE_GAP_VELOCITY}],
             },
             {
                 "title": "Add proposal impact rubric",
@@ -254,6 +393,25 @@ class LocalOracle(Oracle):
                 "expected_delta": 0.05,
                 "body": "# Proposal: add autonomous stop condition\nIf a scheduler-triggered cycle has no accepted change, stop the scheduler and record the blocking reason.\nRequire a different hypothesis source or user review before resuming continuous mode.\nPrimary gap: {gap}\n",
                 "source": "default",
+                "code_changes": [{"target_file": _EXT, "mode": "append", "code": _CODE_VALIDATE_PATCH}],
+            },
+            {
+                "title": "Add route quality scorer",
+                "rationale": "APEX planning quality improves when the oracle favors routes whose signals have not yet been saturated.",
+                "target_signal": "planning_quality",
+                "expected_delta": 0.06,
+                "body": "# Proposal: add route quality scorer\nScore each proposal route by historical acceptance rate for its target signal.\nDe-prioritize signals that have already accumulated high deltas to promote balanced capability growth.\nPrimary gap: {gap}\n",
+                "source": "default",
+                "code_changes": [{"target_file": _EXT, "mode": "append", "code": _CODE_SCORE_ROUTE}],
+            },
+            {
+                "title": "Add novel signal detector",
+                "rationale": "Novelty improves when APEX can identify which signals have been over-targeted and pivot to under-served ones.",
+                "target_signal": "novelty_score",
+                "expected_delta": 0.06,
+                "body": "# Proposal: add novel signal detector\nTrack which capability signals have been repeatedly targeted across accepted proposals.\nFlag signals that appear more than a threshold number of times so the oracle can avoid them.\nPrimary gap: {gap}\n",
+                "source": "default",
+                "code_changes": [{"target_file": _EXT, "mode": "append", "code": _CODE_DETECT_NOVEL}],
             },
         ]
 

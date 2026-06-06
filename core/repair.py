@@ -47,6 +47,7 @@ def classify_failure(reason: str) -> FailureClass:
         "duplicate_proposal": FailureClass.DUPLICATE,
         "already_implemented": FailureClass.CAPABILITY_EXISTS,
         "tests_failed": FailureClass.TEST_FAILURE,
+        "patch_failed": FailureClass.TEST_FAILURE,   # treat like test failure: decompose to simpler scope
         "commit_failed": FailureClass.COMMIT_FAILURE,
     }.get(reason, FailureClass.UNKNOWN)
 

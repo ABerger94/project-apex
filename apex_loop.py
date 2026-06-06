@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -16,7 +17,7 @@ from self_edit.engine import SelfEditEngine
 
 
 MAX_PROPOSAL_ATTEMPTS = 12
-RETRYABLE_REASONS = {"duplicate_proposal", "already_implemented", "tests_failed"}
+RETRYABLE_REASONS = {"duplicate_proposal", "already_implemented", "tests_failed", "patch_failed"}
 
 
 def run_cycle(cycle_number: int) -> dict:
@@ -47,7 +48,14 @@ def run_cycle(cycle_number: int) -> dict:
         result = editor.apply_and_verify(hypothesis)
         attempt: dict = {
             "attempt": attempt_number,
-            "hypothesis": hypothesis.__dict__,
+            "hypothesis": {
+                "title": hypothesis.title,
+                "rationale": hypothesis.rationale,
+                "target_signal": hypothesis.target_signal,
+                "expected_delta": hypothesis.expected_delta,
+                "proposed_patch": hypothesis.proposed_patch,
+                "code_patches_count": len(hypothesis.code_changes),
+            },
             "accepted": result.accepted,
             "commit_hash": result.commit_hash,
             "result_reason": result.reason,
@@ -82,13 +90,20 @@ def run_cycle(cycle_number: int) -> dict:
                 obj.status = "achieved"
         planner.save_objectives(objectives)
 
-    event = {
+    event: dict = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "cycle": cycle_number,
         "scores": scores.__dict__,
         "current_level": scores.current_level,
         "gap": gap,
-        "hypothesis": hypothesis.__dict__,
+        "hypothesis": {
+            "title": hypothesis.title,
+            "rationale": hypothesis.rationale,
+            "target_signal": hypothesis.target_signal,
+            "expected_delta": hypothesis.expected_delta,
+            "proposed_patch": hypothesis.proposed_patch,
+            "code_patches_count": len(hypothesis.code_changes),
+        },
         "accepted": result.accepted,
         "commit_hash": result.commit_hash,
         "result_reason": result.reason,
@@ -98,8 +113,60 @@ def run_cycle(cycle_number: int) -> dict:
         "objectives": [asdict(o) for o in objectives],
         "roadmap_id": roadmap.id,
     }
+
+    _call_extensions(event, scores)
     append_memory(event)
     return event
+
+
+def _call_extensions(event: dict, before_scores) -> None:
+    """Call any extension functions that have been added to core/extensions.py."""
+    try:
+        import core.extensions as _ext
+        importlib.reload(_ext)
+
+        if hasattr(_ext, "audit_cycle"):
+            event["cycle_audit"] = _ext.audit_cycle(event)
+
+        if hasattr(_ext, "gap_velocity"):
+            event["gap_velocity"] = _ext.gap_velocity(_load_recent_events(10))
+
+        if hasattr(_ext, "signal_saturation"):
+            from levels.l5_capabilities import CAPABILITIES
+            event["saturated_signals"] = list(_ext.signal_saturation(CAPABILITIES))
+
+        if hasattr(_ext, "verify_gain"):
+            after_signals = baseline_signals()
+            after_scores = assess_capabilities(after_signals)
+            event["gain_verification"] = _ext.verify_gain(
+                before_scores.__dict__, after_scores.__dict__
+            )
+
+        if hasattr(_ext, "rank_objectives_by_impact"):
+            event["ranked_objectives"] = _ext.rank_objectives_by_impact(event.get("objectives", []))
+
+        if hasattr(_ext, "detect_stagnation"):
+            event["stagnation"] = _ext.detect_stagnation(_load_recent_events(10))
+
+        if hasattr(_ext, "detect_novel_signals"):
+            event["over_targeted_signals"] = _ext.detect_novel_signals(_load_recent_events(20))
+
+    except Exception:
+        pass
+
+
+def _load_recent_events(n: int) -> list:
+    """Load the last n events from the episodic log."""
+    if not CONFIG.memory_log.exists():
+        return []
+    lines = CONFIG.memory_log.read_text(encoding="utf-8").splitlines()
+    events = []
+    for line in lines[-n:]:
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return events
 
 
 def append_memory(event: dict) -> None:

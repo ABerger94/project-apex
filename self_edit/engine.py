@@ -9,6 +9,7 @@ from pathlib import Path
 
 from config import SandboxConfig
 from core.oracle import Hypothesis
+from self_edit.code_patcher import CodePatch, PatchError, apply_patch
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,20 @@ class SelfEditEngine:
 
         proposal_path = self._write_proposal(hypothesis)
         changed_paths = [proposal_path]
-        implementation_result = self._apply_implementation(hypothesis)
+
+        try:
+            implementation_result = self._apply_implementation(hypothesis)
+        except PatchError as exc:
+            self._git(["checkout", "--", str(proposal_path.relative_to(self.root))])
+            return EditResult(
+                accepted=False,
+                commit_hash=None,
+                test_output=str(exc),
+                proposal_path=proposal_path,
+                reason="patch_failed",
+                changed_paths=(proposal_path,),
+            )
+
         changed_paths.extend(implementation_result)
         test_result = self._run_tests()
         output = (test_result.stdout or "") + (test_result.stderr or "")
@@ -65,6 +79,38 @@ class SelfEditEngine:
 
         commit_hash = self._git(["rev-parse", "--short", "HEAD"]).stdout.strip()
         return EditResult(True, commit_hash or None, output, proposal_path, "accepted", tuple(changed_paths))
+
+    def _apply_implementation(self, hypothesis: Hypothesis) -> list[Path]:
+        """Apply code patches from hypothesis.code_changes, then update CAPABILITIES index."""
+        changed_paths: list[Path] = []
+
+        for change in hypothesis.code_changes:
+            patch = CodePatch(
+                target_file=str(change["target_file"]),
+                mode=str(change.get("mode", "append")),
+                code=str(change["code"]),
+            )
+            patched = apply_patch(self.root, patch)   # raises PatchError on failure
+            changed_paths.append(patched)
+
+        capability_path = self.root / "levels" / "l5_capabilities.py"
+        capabilities = self._read_capabilities(capability_path)
+        capability_id = self._slug(hypothesis.title)
+        capabilities.append({
+            "id": capability_id,
+            "title": hypothesis.title,
+            "rationale": hypothesis.rationale,
+            "target_signal": hypothesis.target_signal,
+            "expected_delta": round(max(0.0, min(0.12, float(hypothesis.expected_delta))), 4),
+            "implemented_at": datetime.now(timezone.utc).isoformat(),
+            "evidence": (
+                f"Code patch applied to {[c['target_file'] for c in hypothesis.code_changes]}; "
+                "tests passed; committed."
+            ) if hypothesis.code_changes else "Logged by SelfEditEngine from accepted hypothesis.",
+        })
+        self._write_capabilities(capability_path, capabilities)
+        changed_paths.append(capability_path)
+        return changed_paths
 
     def _write_proposal(self, hypothesis: Hypothesis) -> Path:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -95,22 +141,6 @@ class SelfEditEngine:
             "```",
             "",
         ])
-
-    def _apply_implementation(self, hypothesis: Hypothesis) -> list[Path]:
-        capability_path = self.root / "levels" / "l5_capabilities.py"
-        capabilities = self._read_capabilities(capability_path)
-        capability_id = self._slug(hypothesis.title)
-        capabilities.append({
-            "id": capability_id,
-            "title": hypothesis.title,
-            "rationale": hypothesis.rationale,
-            "target_signal": hypothesis.target_signal,
-            "expected_delta": round(max(0.0, min(0.12, float(hypothesis.expected_delta))), 4),
-            "implemented_at": datetime.now(timezone.utc).isoformat(),
-            "evidence": "Implemented by SelfEditEngine from accepted hypothesis.",
-        })
-        self._write_capabilities(capability_path, capabilities)
-        return [capability_path]
 
     def _capability_exists(self, hypothesis: Hypothesis) -> bool:
         capability_path = self.root / "levels" / "l5_capabilities.py"
