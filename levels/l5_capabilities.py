@@ -40,7 +40,15 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'rationale': 'L5 organizers need to coordinate teams of specialized sub-agents with delegated '
                'responsibilities and escalation paths.',
   'target_signal': 'coordination_score',
-  'title': 'Add sub-agent team operating model'}]
+  'title': 'Add sub-agent team operating model'},
+ {'evidence': "Code patch applied to ['core/extensions.py']; tests passed; committed.",
+  'expected_delta': 0.06,
+  'id': 'add-novel-signal-detector',
+  'implemented_at': '2026-06-06T18:34:34.335118+00:00',
+  'rationale': 'Novelty improves when APEX can identify which signals have been over-targeted and '
+               'pivot to under-served ones.',
+  'target_signal': 'novelty_score',
+  'title': 'Add novel signal detector'}]
 
 
 def capability_signals() -> dict[str, float]:
