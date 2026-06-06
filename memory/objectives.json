@@ -1,6 +1,6 @@
 [
   {
-    "id": "a2efe232",
+    "id": "e6a86765",
     "description": "Stabilize L3 execution_success as foundation for higher capability levels",
     "target_signal": "execution_success",
     "current_score": 0.45,
