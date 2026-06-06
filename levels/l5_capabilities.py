@@ -32,7 +32,15 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'rationale': 'L5 requires managing several workstreams at once, including dependencies, owners, '
                'blockers, and delivery gates.',
   'target_signal': 'coordination_score',
-  'title': 'Add multi-workstream orchestration map'}]
+  'title': 'Add multi-workstream orchestration map'},
+ {'evidence': 'Implemented by SelfEditEngine from accepted hypothesis.',
+  'expected_delta': 0.1,
+  'id': 'add-sub-agent-team-operating-model',
+  'implemented_at': '2026-06-06T17:30:54.933419+00:00',
+  'rationale': 'L5 organizers need to coordinate teams of specialized sub-agents with delegated '
+               'responsibilities and escalation paths.',
+  'target_signal': 'coordination_score',
+  'title': 'Add sub-agent team operating model'}]
 
 
 def capability_signals() -> dict[str, float]:
