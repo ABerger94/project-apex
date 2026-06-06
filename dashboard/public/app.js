@@ -245,7 +245,7 @@ async function askChat(event) {
     const data = await response.json();
     els.chatMessages.lastElementChild.remove();
     const citations = data.citations?.length ? `Sources: ${data.citations.join(", ")}` : "";
-    els.chatProvider.textContent = data.provider || "local";
+    els.chatProvider.textContent = data.model ? `${data.provider} / ${data.model}` : data.provider || "local";
     addChatMessage("assistant", data.answer || data.error || "No answer returned.", citations);
   } catch (error) {
     els.chatMessages.lastElementChild.remove();

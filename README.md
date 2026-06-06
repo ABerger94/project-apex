@@ -44,7 +44,7 @@ npm run dashboard
 
 Open `http://localhost:4177` to view runs, proposals, Git commits, working tree status, and to launch a one-cycle APEX run.
 The dashboard also includes an autonomous scheduler for interval runs, such as every 1, 2, or 5 hours, plus a continuous mode that starts the next cycle as soon as the prior cycle finishes.
-The APEX Chat panel can answer questions from current logs, commits, proposals, scheduler state, and source summaries. Set `APEX_CHAT_PROVIDER=base44` with Base44 env vars to route chat answers through `InvokeLLM`; otherwise it uses a local grounded responder.
+The APEX Chat panel can answer questions from current logs, commits, proposals, scheduler state, and source summaries. Set `APEX_CHAT_PROVIDER=groq` and `GROQ_API_KEY` to route chat answers through Groq. Set `APEX_CHAT_PROVIDER=base44` with Base44 env vars to route chat answers through `InvokeLLM`; otherwise it uses a local grounded responder.
 
 Windows launchers are available in `scripts/`:
 

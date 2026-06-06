@@ -411,13 +411,78 @@ async function answerWithBase44(question, context) {
   }
 }
 
+async function answerWithGroq(question, context) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || process.env.APEX_CHAT_PROVIDER !== "groq") return null;
+
+  const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+  const prompt = [
+    "You are the APEX Command Center assistant.",
+    "Answer only from the provided APEX context. If information is not present, say so.",
+    "Be concise and operational. Distinguish recorded state from inference.",
+    "Return plain text. Do not invent hidden thoughts; describe recorded hypotheses, logs, and state.",
+    "",
+    `Question: ${question}`,
+    "",
+    `APEX context:\n${JSON.stringify(context, null, 2)}`,
+  ].join("\n");
+
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: "You answer questions about APEX from supplied context only.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.2,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return {
+        answer: `Groq chat failed, so I am using local context instead.\n\n${answerLocally(question, context)}`,
+        citations: ["dashboard/server.js", "local fallback"],
+        provider: "local-fallback",
+        error: data.error?.message || response.statusText,
+      };
+    }
+
+    return {
+      answer: String(data.choices?.[0]?.message?.content || "").trim() || answerLocally(question, context),
+      citations: ["Groq chat completion", "memory/episodic_log.jsonl", "git log", "scheduler state", "self_edit/proposals"],
+      provider: "groq",
+      model,
+    };
+  } catch (error) {
+    return {
+      answer: `Groq chat failed, so I am using local context instead.\n\n${answerLocally(question, context)}`,
+      citations: ["dashboard/server.js", "local fallback"],
+      provider: "local-fallback",
+      error: error.message,
+    };
+  }
+}
+
 async function chat(req, res) {
   const body = await readBody(req);
   const question = String(body.message || body.question || "").trim();
   if (!question) return sendJson(res, 400, { ok: false, error: "Message is required." });
 
   const context = await knowledgePack();
-  const llmAnswer = await answerWithBase44(question, context);
+  const llmAnswer = await answerWithGroq(question, context) || await answerWithBase44(question, context);
   const payload = llmAnswer || {
     answer: answerLocally(question, context),
     citations: ["memory/episodic_log.jsonl", "git log", "scheduler state", "self_edit/proposals"],
