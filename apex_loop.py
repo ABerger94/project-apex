@@ -28,6 +28,7 @@ def run_cycle(cycle_number: int) -> dict:
         "hypothesis": hypothesis.__dict__,
         "accepted": result.accepted,
         "commit_hash": result.commit_hash,
+        "result_reason": result.reason,
         "proposal_path": str(result.proposal_path.relative_to(CONFIG.root)),
     }
     append_memory(event)

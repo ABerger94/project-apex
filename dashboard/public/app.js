@@ -99,6 +99,7 @@ function renderRuns(events) {
             <span class="badge ${event.accepted ? "ok" : "fail"}">${accepted}</span>
           </div>
           <p class="gap">${escapeHtml(event.gap)}</p>
+          ${event.result_reason ? `<p class="muted">Result: ${escapeHtml(event.result_reason)}</p>` : ""}
           <div class="score-row">
             <div class="score-pill">L3<strong>${pct(scores.l3_agent)}</strong></div>
             <div class="score-pill">L4<strong>${pct(scores.l4_innovator)}</strong></div>
