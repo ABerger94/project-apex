@@ -2,7 +2,6 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-self_edit/proposals/
 memory/episodic_log.jsonl
 node_modules/
 package-lock.json

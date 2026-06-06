@@ -34,8 +34,11 @@ class SelfEditEngine:
 
         self._git(["add", str(proposal_path.relative_to(self.root))])
         commit = self._git(["commit", "-m", f"APEX proposal: {hypothesis.title}"])
+        if commit.returncode != 0:
+            return EditResult(False, None, output + commit.stderr, proposal_path)
+
         commit_hash = self._git(["rev-parse", "--short", "HEAD"]).stdout.strip()
-        return EditResult(commit.returncode == 0, commit_hash or None, output, proposal_path)
+        return EditResult(True, commit_hash or None, output, proposal_path)
 
     def _write_proposal(self, hypothesis: Hypothesis) -> Path:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
