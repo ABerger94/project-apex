@@ -56,7 +56,15 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'rationale': 'APEX planning quality improves when the oracle favors routes whose signals have '
                'not yet been saturated.',
   'target_signal': 'planning_quality',
-  'title': 'Add route quality scorer'}]
+  'title': 'Add route quality scorer'},
+ {'evidence': "Code patch applied to ['core/extensions.py']; tests passed; committed.",
+  'expected_delta': 0.05,
+  'id': 'add-autonomous-stop-condition',
+  'implemented_at': '2026-06-06T18:34:49.158580+00:00',
+  'rationale': 'Continuous autonomy should stop when cycles fail to make accepted progress, then '
+               'explain what blocked progress.',
+  'target_signal': 'execution_success',
+  'title': 'Add autonomous stop condition'}]
 
 
 def capability_signals() -> dict[str, float]:

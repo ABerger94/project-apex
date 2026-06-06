@@ -21,3 +21,11 @@ def score_route_by_history(route, accepted_signals):
     if successes <= 2:
         return 0.7
     return 0.4
+
+
+def validate_patch_safety(code):
+    risky = ['os.system(', 'subprocess.call(', 'eval(', 'exec(', 'shutil.rmtree', '__import__(']
+    found = [p for p in risky if p in code]
+    if len(code.strip()) < 10:
+        found.append('patch_too_short')
+    return found
