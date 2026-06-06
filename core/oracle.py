@@ -37,7 +37,13 @@ class Hypothesis:
 
 
 class Oracle:
-    def propose(self, scores: CapabilityScores, gap: str, rejected: list[dict] | None = None) -> Hypothesis:
+    def propose(
+        self,
+        scores: CapabilityScores,
+        gap: str,
+        rejected: list[dict] | None = None,
+        preferred_signal: str | None = None,
+    ) -> Hypothesis:
         raise NotImplementedError
 
 
@@ -45,14 +51,20 @@ class LocalOracle(Oracle):
     def __init__(self, route_path: Path = DEFAULT_ROUTE_PATH) -> None:
         self.route_path = route_path
 
-    def propose(self, scores: CapabilityScores, gap: str, rejected: list[dict] | None = None) -> Hypothesis:
+    def propose(
+        self,
+        scores: CapabilityScores,
+        gap: str,
+        rejected: list[dict] | None = None,
+        preferred_signal: str | None = None,
+    ) -> Hypothesis:
         rejected_titles = {str(item.get("title", "")).lower() for item in rejected or []}
-        routes = self._rank_routes(self._load_routes(), gap)
+        routes = self._rank_routes(self._load_routes(), gap, preferred_signal)
         for route in routes:
             if route["title"].lower() not in rejected_titles:
                 return self._route_to_hypothesis(route, scores, gap)
 
-        route = self._expand_routes(routes, scores, gap)
+        route = self._expand_routes(routes, scores, gap, preferred_signal)
         return self._route_to_hypothesis(route, scores, gap)
 
     def _load_routes(self) -> list[dict]:
@@ -81,10 +93,16 @@ class LocalOracle(Oracle):
         self.route_path.parent.mkdir(parents=True, exist_ok=True)
         self.route_path.write_text(json.dumps(routes, indent=2), encoding="utf-8")
 
-    def _expand_routes(self, routes: list[dict], scores: CapabilityScores, gap: str) -> dict:
+    def _expand_routes(
+        self,
+        routes: list[dict],
+        scores: CapabilityScores,
+        gap: str,
+        preferred_signal: str | None = None,
+    ) -> dict:
         route_number = len(routes) + 1
         signal_cycle = ["coordination_score", "accountability_score", "measured_gain"]
-        target_signal = signal_cycle[route_number % len(signal_cycle)]
+        target_signal = preferred_signal or signal_cycle[route_number % len(signal_cycle)]
         theme_cycle = [
             "sub-agent operating model",
             "multi-workstream dependency control",
@@ -112,15 +130,20 @@ class LocalOracle(Oracle):
         self._save_routes(routes)
         return route
 
-    def _rank_routes(self, routes: list[dict], gap: str) -> list[dict]:
-        return sorted(routes, key=lambda route: self._route_priority(route, gap), reverse=True)
+    def _rank_routes(self, routes: list[dict], gap: str, preferred_signal: str | None = None) -> list[dict]:
+        return sorted(
+            routes,
+            key=lambda route: self._route_priority(route, gap, preferred_signal),
+            reverse=True,
+        )
 
-    def _route_priority(self, route: dict, gap: str) -> tuple[int, int, float]:
+    def _route_priority(self, route: dict, gap: str, preferred_signal: str | None = None) -> tuple:
         text = " ".join(str(route.get(key, "")) for key in ("title", "rationale", "body")).lower()
         l5_signal = 1 if str(route.get("target_signal", "")) in L5_SIGNALS else 0
         keyword_hits = sum(1 for keyword in L5_KEYWORDS if keyword in text)
         gap_bonus = 1 if "l5" in gap.lower() and l5_signal else 0
-        return (l5_signal + gap_bonus, keyword_hits, float(route.get("expected_delta", 0.0)))
+        preferred_match = 1 if preferred_signal and str(route.get("target_signal", "")) == preferred_signal else 0
+        return (preferred_match, l5_signal + gap_bonus, keyword_hits, float(route.get("expected_delta", 0.0)))
 
     def _route_to_hypothesis(self, route: dict, scores: CapabilityScores, gap: str) -> Hypothesis:
         return Hypothesis(
@@ -239,9 +262,15 @@ class Base44Oracle(Oracle):
     def __init__(self, config: Base44Config) -> None:
         self.config = config
 
-    def propose(self, scores: CapabilityScores, gap: str, rejected: list[dict] | None = None) -> Hypothesis:
+    def propose(
+        self,
+        scores: CapabilityScores,
+        gap: str,
+        rejected: list[dict] | None = None,
+        preferred_signal: str | None = None,
+    ) -> Hypothesis:
         if not self.config.enabled:
-            return LocalOracle().propose(scores, gap, rejected)
+            return LocalOracle().propose(scores, gap, rejected, preferred_signal)
 
         prompt = {
             "role": "APEX Oracle",
