@@ -11,7 +11,7 @@ from metrics import assess_capabilities, identify_largest_gap
 from self_edit.engine import SelfEditEngine
 
 
-MAX_PROPOSAL_ATTEMPTS = 4
+MAX_PROPOSAL_ATTEMPTS = 12
 
 
 def run_cycle(cycle_number: int) -> dict:

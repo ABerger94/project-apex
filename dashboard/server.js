@@ -166,7 +166,7 @@ function readSourceSummary() {
     const content = safeRead(path.join(root, relativePath));
     return {
       path: relativePath,
-      preview: content.split(/\r?\n/).slice(0, 80).join("\n"),
+      preview: content.split(/\r?\n/).slice(0, 24).join("\n"),
     };
   });
 }
@@ -211,9 +211,24 @@ async function knowledgePack() {
       base44Configured: Boolean(process.env.BASE44_APP_ID || process.env.VITE_BASE44_APP_ID),
     },
     latest: state.latest,
-    recentEvents: state.events.slice(0, 8),
-    proposals: state.proposals.slice(0, 8),
-    commits: state.commits,
+    recentEvents: state.events.slice(0, 3).map((event) => ({
+      timestamp: event.timestamp,
+      current_level: event.current_level,
+      gap: event.gap,
+      accepted: event.accepted,
+      commit_hash: event.commit_hash,
+      result_reason: event.result_reason,
+      hypothesis: event.hypothesis,
+      attempts: event.attempts?.map((attempt) => ({
+        attempt: attempt.attempt,
+        accepted: attempt.accepted,
+        result_reason: attempt.result_reason,
+        title: attempt.hypothesis?.title,
+        target_signal: attempt.hypothesis?.target_signal,
+      })),
+    })),
+    proposals: state.proposals.slice(0, 3),
+    commits: state.commits.slice(0, 6),
     status: state.status,
     scheduler: state.scheduler,
     source: readSourceSummary(),
@@ -248,14 +263,22 @@ async function executeApexCycle(trigger = "manual") {
   scheduler.lastStartedAt = new Date().toISOString();
   const { command, argsPrefix } = pythonCommand();
   const result = await run(command, [...argsPrefix, "apex_loop.py", "--cycles", "1"]);
+  const event = parseApexEvent(result.stdout);
+  const madeProgress = result.code === 0 && event?.accepted === true;
   scheduler.running = false;
   scheduler.lastFinishedAt = new Date().toISOString();
   scheduler.lastResult = {
-    ok: result.code === 0,
+    ok: madeProgress,
     trigger,
     finishedAt: scheduler.lastFinishedAt,
+    resultReason: event?.result_reason || null,
+    commitHash: event?.commit_hash || null,
   };
   persistSchedulerState();
+
+  if (trigger === "scheduler" && !madeProgress) {
+    stopScheduler();
+  }
 
   if (scheduler.enabled && scheduler.mode === "continuous") {
     scheduleNextRun(Math.max(minIntervalMs, continuousCooldownMs));
@@ -266,6 +289,7 @@ async function executeApexCycle(trigger = "manual") {
   const state = await dashboardState();
   return {
     ok: result.code === 0,
+    madeProgress,
     skipped: false,
     trigger,
     command: [command, ...argsPrefix, "apex_loop.py", "--cycles", "1"].join(" "),
@@ -273,6 +297,21 @@ async function executeApexCycle(trigger = "manual") {
     stderr: result.stderr,
     state,
   };
+}
+
+function parseApexEvent(stdout) {
+  try {
+    return JSON.parse(stdout);
+  } catch {
+    const start = stdout.indexOf("{");
+    const end = stdout.lastIndexOf("}");
+    if (start === -1 || end === -1 || end <= start) return null;
+    try {
+      return JSON.parse(stdout.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
 }
 
 function clearSchedulerTimer() {

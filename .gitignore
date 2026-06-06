@@ -3,5 +3,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 memory/episodic_log.jsonl
+memory/proposal_routes.json
 memory/scheduler_state.json
 node_modules/
