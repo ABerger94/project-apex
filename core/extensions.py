@@ -69,3 +69,15 @@ def gap_velocity(events):
             totals[gap] += delta
             counts[gap] += 1
     return {g: round(totals[g] / counts[g], 4) for g in totals}
+
+
+def detect_stagnation(events, window=5):
+    recent = events[-window:]
+    accepted = [e for e in recent if e.get('accepted')]
+    signals_used = [e.get('hypothesis', {}).get('target_signal', '') for e in accepted]
+    return {
+        'window': window,
+        'acceptance_rate': round(len(accepted) / max(len(recent), 1), 4),
+        'repeated_signals': len(signals_used) != len(set(signals_used)),
+        'stagnating': len(accepted) < window // 2,
+    }

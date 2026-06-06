@@ -94,7 +94,14 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'rationale': 'Progress toward L5 requires remembering active objectives across cycles instead of '
                'evaluating each cycle in isolation.',
   'target_signal': 'coordination_score',
-  'title': 'Add cross-cycle goal memory'}]
+  'title': 'Add cross-cycle goal memory'},
+ {'evidence': "Code patch applied to ['core/extensions.py']; tests passed; committed.",
+  'expected_delta': 0.06,
+  'id': 'add-anti-stagnation-proposal-policy',
+  'implemented_at': '2026-06-06T18:57:56.532934+00:00',
+  'rationale': 'APEX cannot progress toward L5 if it repeats proposals after rejection.',
+  'target_signal': 'measured_gain',
+  'title': 'Add anti-stagnation proposal policy'}]
 
 
 def capability_signals() -> dict[str, float]:
