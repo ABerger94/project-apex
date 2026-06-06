@@ -100,6 +100,7 @@ function renderRuns(events) {
           </div>
           <p class="gap">${escapeHtml(event.gap)}</p>
           ${event.result_reason ? `<p class="muted">Result: ${escapeHtml(event.result_reason)}</p>` : ""}
+          ${event.attempts?.length ? `<p class="muted">Attempts: ${event.attempts.length}</p>` : ""}
           <div class="score-row">
             <div class="score-pill">L3<strong>${pct(scores.l3_agent)}</strong></div>
             <div class="score-pill">L4<strong>${pct(scores.l4_innovator)}</strong></div>

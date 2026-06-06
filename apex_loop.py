@@ -11,13 +11,37 @@ from metrics import assess_capabilities, identify_largest_gap
 from self_edit.engine import SelfEditEngine
 
 
+MAX_PROPOSAL_ATTEMPTS = 4
+
+
 def run_cycle(cycle_number: int) -> dict:
     scores = assess_capabilities(baseline_signals())
     gap = identify_largest_gap(scores)
     oracle = create_oracle(CONFIG.base44)
-    hypothesis = oracle.propose(scores, gap)
     editor = SelfEditEngine(CONFIG.root, CONFIG.sandbox)
-    result = editor.apply_and_verify(hypothesis)
+    rejected: list[dict] = []
+    attempts: list[dict] = []
+
+    for attempt_number in range(1, MAX_PROPOSAL_ATTEMPTS + 1):
+        hypothesis = oracle.propose(scores, gap, rejected)
+        result = editor.apply_and_verify(hypothesis)
+        attempt = {
+            "attempt": attempt_number,
+            "hypothesis": hypothesis.__dict__,
+            "accepted": result.accepted,
+            "commit_hash": result.commit_hash,
+            "result_reason": result.reason,
+            "proposal_path": str(result.proposal_path.relative_to(CONFIG.root)),
+        }
+        attempts.append(attempt)
+        if result.accepted or result.reason != "duplicate_proposal":
+            break
+        rejected.append({
+            "title": hypothesis.title,
+            "target_signal": hypothesis.target_signal,
+            "reason": result.reason,
+            "proposal_path": attempt["proposal_path"],
+        })
 
     event = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -30,6 +54,7 @@ def run_cycle(cycle_number: int) -> dict:
         "commit_hash": result.commit_hash,
         "result_reason": result.reason,
         "proposal_path": str(result.proposal_path.relative_to(CONFIG.root)),
+        "attempts": attempts,
     }
     append_memory(event)
     return event

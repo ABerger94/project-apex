@@ -11,6 +11,15 @@ class OracleTests(unittest.TestCase):
         self.assertGreater(hypothesis.expected_delta, 0)
         self.assertIn("Primary gap", hypothesis.proposed_patch)
 
+    def test_local_oracle_avoids_rejected_title(self):
+        hypothesis = LocalOracle().propose(
+            CapabilityScores(0.4, 0.2, 0.1),
+            "L5 organizational coordination",
+            rejected=[{"title": "Increase benchmark observability"}],
+        )
+        self.assertNotEqual(hypothesis.title, "Increase benchmark observability")
+        self.assertIn("L5", hypothesis.title)
+
 
 if __name__ == "__main__":
     unittest.main()

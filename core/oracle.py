@@ -18,40 +18,83 @@ class Hypothesis:
 
 
 class Oracle:
-    def propose(self, scores: CapabilityScores, gap: str) -> Hypothesis:
+    def propose(self, scores: CapabilityScores, gap: str, rejected: list[dict] | None = None) -> Hypothesis:
         raise NotImplementedError
 
 
 class LocalOracle(Oracle):
-    def propose(self, scores: CapabilityScores, gap: str) -> Hypothesis:
-        patch = (
-            "# Proposal: improve benchmark observability\n"
-            "Add richer benchmark signals before attempting autonomous code mutation.\n"
-            f"Current aggregate score: {scores.aggregate}\n"
-            f"Primary gap: {gap}\n"
-        )
-        return Hypothesis(
-            title="Increase benchmark observability",
-            rationale="APEX should improve measurement before trusting self-edits.",
-            target_signal="verification_coverage",
-            expected_delta=0.05,
-            proposed_patch=patch,
-        )
+    def propose(self, scores: CapabilityScores, gap: str, rejected: list[dict] | None = None) -> Hypothesis:
+        rejected_titles = {str(item.get("title", "")).lower() for item in rejected or []}
+        options = [
+            Hypothesis(
+                title="Increase benchmark observability",
+                rationale="APEX should improve measurement before trusting self-edits.",
+                target_signal="verification_coverage",
+                expected_delta=0.05,
+                proposed_patch=(
+                    "# Proposal: improve benchmark observability\n"
+                    "Add richer benchmark signals before attempting autonomous code mutation.\n"
+                    f"Current aggregate score: {scores.aggregate}\n"
+                    f"Primary gap: {gap}\n"
+                ),
+            ),
+            Hypothesis(
+                title="Add L5 coordination benchmark",
+                rationale="The largest gap is organizational coordination, so APEX needs a benchmark that measures delegated workflows.",
+                target_signal="coordination_score",
+                expected_delta=0.08,
+                proposed_patch=(
+                    "# Proposal: add L5 coordination benchmark\n"
+                    "Define a repeatable scenario where APEX plans owners, dependencies, status checks, and completion evidence.\n"
+                    "Score whether each dependency has an accountable owner and measurable completion criteria.\n"
+                    f"Primary gap: {gap}\n"
+                ),
+            ),
+            Hypothesis(
+                title="Add accountability signal audit",
+                rationale="L5 requires organization-level accountability, not just individual task execution.",
+                target_signal="accountability_score",
+                expected_delta=0.07,
+                proposed_patch=(
+                    "# Proposal: add accountability signal audit\n"
+                    "Record whether every APEX action has a responsible module, expected outcome, verification method, and rollback path.\n"
+                    "Use the audit to penalize vague proposals and reward operationally complete plans.\n"
+                    f"Primary gap: {gap}\n"
+                ),
+            ),
+            Hypothesis(
+                title="Add anti-stagnation proposal policy",
+                rationale="APEX cannot progress toward L5 if it repeats proposals after rejection.",
+                target_signal="measured_gain",
+                expected_delta=0.06,
+                proposed_patch=(
+                    "# Proposal: add anti-stagnation proposal policy\n"
+                    "When a hypothesis is rejected as duplicate, require the next hypothesis to target a different signal or a different L5 capability.\n"
+                    "Track rejected titles and patches in the cycle log so future cycles can avoid them.\n"
+                    f"Primary gap: {gap}\n"
+                ),
+            ),
+        ]
+        for option in options:
+            if option.title.lower() not in rejected_titles:
+                return option
+        return options[-1]
 
 
 class Base44Oracle(Oracle):
     def __init__(self, config: Base44Config) -> None:
         self.config = config
 
-    def propose(self, scores: CapabilityScores, gap: str) -> Hypothesis:
+    def propose(self, scores: CapabilityScores, gap: str, rejected: list[dict] | None = None) -> Hypothesis:
         if not self.config.enabled:
-            return LocalOracle().propose(scores, gap)
+            return LocalOracle().propose(scores, gap, rejected)
 
         prompt = {
             "role": "APEX Oracle",
-            "task": "Propose one small reversible code change to improve APEX capability.",
+            "task": "Propose one small reversible code change to improve APEX capability. Do not repeat rejected proposals.",
             "scores": scores.__dict__,
             "gap": gap,
+            "rejected": rejected or [],
             "schema": {
                 "title": "string",
                 "rationale": "string",
@@ -78,7 +121,7 @@ class Base44Oracle(Oracle):
             check=False,
         )
         if result.returncode != 0:
-            fallback = LocalOracle().propose(scores, gap)
+            fallback = LocalOracle().propose(scores, gap, rejected)
             return Hypothesis(
                 title=fallback.title,
                 rationale=f"{fallback.rationale} Base44 InvokeLLM failed: {result.stderr.strip()}",
