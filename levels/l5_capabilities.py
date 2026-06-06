@@ -71,7 +71,15 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'implemented_at': '2026-06-06T18:34:49.444670+00:00',
   'rationale': 'L5 requires organization-level accountability, not just individual task execution.',
   'target_signal': 'accountability_score',
-  'title': 'Add accountability signal audit'}]
+  'title': 'Add accountability signal audit'},
+ {'evidence': "Code patch applied to ['core/extensions.py']; tests passed; committed.",
+  'expected_delta': 0.07,
+  'id': 'add-l5-dependency-map',
+  'implemented_at': '2026-06-06T18:34:49.785262+00:00',
+  'rationale': 'L5 behavior needs explicit dependency tracking across workstreams before it can '
+               'coordinate organization-scale execution.',
+  'target_signal': 'coordination_score',
+  'title': 'Add L5 dependency map'}]
 
 
 def capability_signals() -> dict[str, float]:

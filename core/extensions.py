@@ -38,3 +38,11 @@ def signal_saturation(capabilities, cap=0.80):
         delta = float(c.get('expected_delta', 0.0))
         totals[sig] = totals.get(sig, 0.0) + delta
     return {sig for sig, total in totals.items() if total >= cap}
+
+
+def rank_objectives_by_impact(objectives):
+    return sorted(
+        objectives,
+        key=lambda o: o.get('target_score', 0) - o.get('current_score', 0),
+        reverse=True,
+    )
