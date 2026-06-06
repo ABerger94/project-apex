@@ -24,7 +24,15 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'rationale': 'APEX needs a stronger way to rank proposals by expected progress toward L5 '
                'coordination and accountability.',
   'target_signal': 'measured_gain',
-  'title': 'Add proposal impact rubric'}]
+  'title': 'Add proposal impact rubric'},
+ {'evidence': 'Implemented by SelfEditEngine from accepted hypothesis.',
+  'expected_delta': 0.1,
+  'id': 'add-multi-workstream-orchestration-map',
+  'implemented_at': '2026-06-06T17:30:54.715569+00:00',
+  'rationale': 'L5 requires managing several workstreams at once, including dependencies, owners, '
+               'blockers, and delivery gates.',
+  'target_signal': 'coordination_score',
+  'title': 'Add multi-workstream orchestration map'}]
 
 
 def capability_signals() -> dict[str, float]:
