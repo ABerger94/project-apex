@@ -48,7 +48,15 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'rationale': 'Novelty improves when APEX can identify which signals have been over-targeted and '
                'pivot to under-served ones.',
   'target_signal': 'novelty_score',
-  'title': 'Add novel signal detector'}]
+  'title': 'Add novel signal detector'},
+ {'evidence': "Code patch applied to ['core/extensions.py']; tests passed; committed.",
+  'expected_delta': 0.06,
+  'id': 'add-route-quality-scorer',
+  'implemented_at': '2026-06-06T18:34:48.881608+00:00',
+  'rationale': 'APEX planning quality improves when the oracle favors routes whose signals have '
+               'not yet been saturated.',
+  'target_signal': 'planning_quality',
+  'title': 'Add route quality scorer'}]
 
 
 def capability_signals() -> dict[str, float]:

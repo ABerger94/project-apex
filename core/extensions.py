@@ -11,3 +11,13 @@ def detect_novel_signals(events, threshold=3):
         for ev in events if ev.get('accepted')
     )
     return [sig for sig, n in counts.items() if n >= threshold]
+
+
+def score_route_by_history(route, accepted_signals):
+    signal = str(route.get('target_signal', ''))
+    successes = accepted_signals.count(signal)
+    if successes == 0:
+        return 1.0
+    if successes <= 2:
+        return 0.7
+    return 0.4
