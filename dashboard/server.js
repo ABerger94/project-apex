@@ -181,6 +181,12 @@ async function dashboardState() {
 async function knowledgePack() {
   const state = await dashboardState();
   return {
+    chatProvider: {
+      provider: process.env.APEX_CHAT_PROVIDER || "local",
+      model: process.env.GROQ_MODEL || null,
+      groqConfigured: Boolean(process.env.GROQ_API_KEY),
+      base44Configured: Boolean(process.env.BASE44_APP_ID || process.env.VITE_BASE44_APP_ID),
+    },
     latest: state.latest,
     recentEvents: state.events.slice(0, 8),
     proposals: state.proposals.slice(0, 8),
