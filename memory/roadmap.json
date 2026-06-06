@@ -1,0 +1,54 @@
+{
+  "id": "f9c3b911",
+  "cycle": 5,
+  "created_at": "2026-06-06T17:30:54.929611+00:00",
+  "objectives": [
+    {
+      "id": "a2efe232",
+      "description": "Stabilize L3 execution_success as foundation for higher capability levels",
+      "target_signal": "execution_success",
+      "current_score": 0.45,
+      "target_score": 0.7,
+      "success_criteria": "execution_success >= 0.7 with zero test rollbacks in the cycle",
+      "deadline_cycles": 2,
+      "status": "active"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "a2efe232-assess",
+      "title": "Assess current execution_success baseline",
+      "owner": "metrics",
+      "objective_id": "a2efe232",
+      "depends_on": [],
+      "gate_condition": "assess_capabilities(baseline_signals()) returns CapabilityScores",
+      "verification_evidence": "execution_success current value (0.45) recorded in episodic_log scores snapshot",
+      "status": "pending"
+    },
+    {
+      "id": "a2efe232-propose",
+      "title": "Propose and apply change targeting execution_success",
+      "owner": "engine",
+      "objective_id": "a2efe232",
+      "depends_on": [
+        "a2efe232-assess"
+      ],
+      "gate_condition": "no existing capability covers execution_success with accumulated delta >= 0.25",
+      "verification_evidence": "hypothesis accepted by SelfEditEngine: tests pass, commit_hash non-null, proposal written to self_edit/proposals/",
+      "status": "pending"
+    },
+    {
+      "id": "a2efe232-verify",
+      "title": "Verify execution_success progress toward 0.7",
+      "owner": "metrics",
+      "objective_id": "a2efe232",
+      "depends_on": [
+        "a2efe232-propose"
+      ],
+      "gate_condition": "result.accepted is True and result.commit_hash is not None",
+      "verification_evidence": "reassessed execution_success shows monotone improvement; target 0.7 logged in next cycle's episodic_log",
+      "status": "pending"
+    }
+  ],
+  "status": "active"
+}

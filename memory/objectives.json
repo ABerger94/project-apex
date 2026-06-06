@@ -1,0 +1,12 @@
+[
+  {
+    "id": "a2efe232",
+    "description": "Stabilize L3 execution_success as foundation for higher capability levels",
+    "target_signal": "execution_success",
+    "current_score": 0.45,
+    "target_score": 0.7,
+    "success_criteria": "execution_success >= 0.7 with zero test rollbacks in the cycle",
+    "deadline_cycles": 2,
+    "status": "active"
+  }
+]
