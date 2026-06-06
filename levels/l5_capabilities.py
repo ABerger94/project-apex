@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 
-CAPABILITIES = []
+CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypothesis.',
+  'expected_delta': 0.09,
+  'id': 'add-executive-decision-ledger',
+  'implemented_at': '2026-06-06T17:30:53.995025+00:00',
+  'rationale': 'Organization-scale AI must make and audit high-level decisions across complex '
+               'processes.',
+  'target_signal': 'accountability_score',
+  'title': 'Add executive decision ledger'}]
 
 
 def capability_signals() -> dict[str, float]:
