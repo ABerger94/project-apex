@@ -16,7 +16,15 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'rationale': 'The largest gap is organizational coordination, so APEX needs a benchmark that '
                'measures delegated workflows.',
   'target_signal': 'coordination_score',
-  'title': 'Add L5 coordination benchmark'}]
+  'title': 'Add L5 coordination benchmark'},
+ {'evidence': 'Implemented by SelfEditEngine from accepted hypothesis.',
+  'expected_delta': 0.06,
+  'id': 'add-proposal-impact-rubric',
+  'implemented_at': '2026-06-06T17:30:54.499206+00:00',
+  'rationale': 'APEX needs a stronger way to rank proposals by expected progress toward L5 '
+               'coordination and accountability.',
+  'target_signal': 'measured_gain',
+  'title': 'Add proposal impact rubric'}]
 
 
 def capability_signals() -> dict[str, float]:
