@@ -8,7 +8,15 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'rationale': 'Organization-scale AI must make and audit high-level decisions across complex '
                'processes.',
   'target_signal': 'accountability_score',
-  'title': 'Add executive decision ledger'}]
+  'title': 'Add executive decision ledger'},
+ {'evidence': 'Implemented by SelfEditEngine from accepted hypothesis.',
+  'expected_delta': 0.08,
+  'id': 'add-l5-coordination-benchmark',
+  'implemented_at': '2026-06-06T17:30:54.259413+00:00',
+  'rationale': 'The largest gap is organizational coordination, so APEX needs a benchmark that '
+               'measures delegated workflows.',
+  'target_signal': 'coordination_score',
+  'title': 'Add L5 coordination benchmark'}]
 
 
 def capability_signals() -> dict[str, float]:
