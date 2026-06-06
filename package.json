@@ -1,0 +1,13 @@
+{
+  "name": "project-apex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "python -m unittest discover -s tests",
+    "apex": "python apex_loop.py --cycles 1"
+  },
+  "dependencies": {
+    "@base44/sdk": "^0.8.31"
+  }
+}
