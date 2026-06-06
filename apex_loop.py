@@ -12,6 +12,7 @@ from self_edit.engine import SelfEditEngine
 
 
 MAX_PROPOSAL_ATTEMPTS = 12
+RETRYABLE_REASONS = {"duplicate_proposal", "already_implemented"}
 
 
 def run_cycle(cycle_number: int) -> dict:
@@ -35,7 +36,7 @@ def run_cycle(cycle_number: int) -> dict:
             "changed_paths": [str(path.relative_to(CONFIG.root)) for path in result.changed_paths],
         }
         attempts.append(attempt)
-        if result.accepted or result.reason != "duplicate_proposal":
+        if result.accepted or result.reason not in RETRYABLE_REASONS:
             break
         rejected.append({
             "title": hypothesis.title,

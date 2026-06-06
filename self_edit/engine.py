@@ -37,6 +37,14 @@ class SelfEditEngine:
                 proposal_path=duplicate_path,
                 reason="duplicate_proposal",
             )
+        if self._capability_exists(hypothesis):
+            return EditResult(
+                accepted=False,
+                commit_hash=None,
+                test_output="Capability already implemented; selecting a different proposal.",
+                proposal_path=self.config.proposal_dir,
+                reason="already_implemented",
+            )
 
         proposal_path = self._write_proposal(hypothesis)
         changed_paths = [proposal_path]
@@ -92,9 +100,6 @@ class SelfEditEngine:
         capability_path = self.root / "levels" / "l5_capabilities.py"
         capabilities = self._read_capabilities(capability_path)
         capability_id = self._slug(hypothesis.title)
-        if any(item.get("id") == capability_id for item in capabilities):
-            return []
-
         capabilities.append({
             "id": capability_id,
             "title": hypothesis.title,
@@ -106,6 +111,11 @@ class SelfEditEngine:
         })
         self._write_capabilities(capability_path, capabilities)
         return [capability_path]
+
+    def _capability_exists(self, hypothesis: Hypothesis) -> bool:
+        capability_path = self.root / "levels" / "l5_capabilities.py"
+        capability_id = self._slug(hypothesis.title)
+        return any(item.get("id") == capability_id for item in self._read_capabilities(capability_path))
 
     def _read_capabilities(self, path: Path) -> list[dict]:
         if not path.exists():

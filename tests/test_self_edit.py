@@ -65,6 +65,34 @@ class SelfEditTests(unittest.TestCase):
             self.assertEqual(capabilities[0]["target_signal"], "coordination_score")
             self.assertEqual(capabilities[0]["expected_delta"], 0.08)
 
+    def test_existing_capability_is_rejected_before_new_proposal_commit(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "levels").mkdir()
+            capability_path = root / "levels" / "l5_capabilities.py"
+            config = SandboxConfig(proposal_dir=root / "self_edit" / "proposals")
+            engine = SelfEditEngine(root, config)
+            hypothesis = Hypothesis(
+                title="Add L5 coordination benchmark",
+                rationale="Improve coordination.",
+                target_signal="coordination_score",
+                expected_delta=0.08,
+                proposed_patch="# Proposal: add L5 coordination benchmark",
+            )
+            engine._write_capabilities(capability_path, [{
+                "id": "add-l5-coordination-benchmark",
+                "title": hypothesis.title,
+                "rationale": hypothesis.rationale,
+                "target_signal": hypothesis.target_signal,
+                "expected_delta": hypothesis.expected_delta,
+            }])
+
+            result = engine.apply_and_verify(hypothesis)
+
+            self.assertFalse(result.accepted)
+            self.assertEqual(result.reason, "already_implemented")
+            self.assertFalse(any(config.proposal_dir.glob("*.md")))
+
 
 if __name__ == "__main__":
     unittest.main()
