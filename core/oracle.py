@@ -10,6 +10,21 @@ from metrics import CapabilityScores
 
 
 DEFAULT_ROUTE_PATH = ROOT / "memory" / "proposal_routes.json"
+L5_SIGNALS = {"coordination_score", "accountability_score", "measured_gain"}
+L5_KEYWORDS = (
+    "l5",
+    "organization",
+    "sub-agent",
+    "subagent",
+    "team",
+    "workflow",
+    "dependency",
+    "executive",
+    "decision",
+    "large-scale",
+    "coordination",
+    "accountability",
+)
 
 
 @dataclass(frozen=True)
@@ -32,7 +47,7 @@ class LocalOracle(Oracle):
 
     def propose(self, scores: CapabilityScores, gap: str, rejected: list[dict] | None = None) -> Hypothesis:
         rejected_titles = {str(item.get("title", "")).lower() for item in rejected or []}
-        routes = self._load_routes()
+        routes = self._rank_routes(self._load_routes(), gap)
         for route in routes:
             if route["title"].lower() not in rejected_titles:
                 return self._route_to_hypothesis(route, scores, gap)
@@ -68,17 +83,26 @@ class LocalOracle(Oracle):
 
     def _expand_routes(self, routes: list[dict], scores: CapabilityScores, gap: str) -> dict:
         route_number = len(routes) + 1
-        signal_cycle = ["coordination_score", "accountability_score", "measured_gain", "execution_success"]
+        signal_cycle = ["coordination_score", "accountability_score", "measured_gain"]
         target_signal = signal_cycle[route_number % len(signal_cycle)]
+        theme_cycle = [
+            "sub-agent operating model",
+            "multi-workstream dependency control",
+            "executive decision ledger",
+            "large-scale process coordinator",
+            "cross-functional accountability board",
+        ]
+        theme = theme_cycle[route_number % len(theme_cycle)]
         route = {
-            "title": f"Explore L5 route {route_number}: {target_signal.replace('_', ' ')}",
-            "rationale": "The known proposal routes were rejected or exhausted, so APEX is expanding its route memory with a new L5-oriented path.",
+            "title": f"Explore L5 route {route_number}: {theme}",
+            "rationale": "The known proposal routes were rejected or exhausted, so APEX is expanding route memory with a new organization-scale L5 path.",
             "target_signal": target_signal,
-            "expected_delta": 0.05,
+            "expected_delta": 0.08,
             "body": (
-                "# Proposal: expand L5 route memory\n"
-                f"Create route {route_number} for {target_signal}.\n"
-                "Define a new measurable action path, expected evidence, and rollback criterion before the next autonomous cycle.\n"
+                f"# Proposal: expand L5 route memory with {theme}\n"
+                f"Create route {route_number} for {target_signal} using {theme}.\n"
+                "Define sub-agent roles, delegated workflow steps, decision authority, evidence gates, and rollback criteria.\n"
+                "Require the next implementation to improve organization-scale coordination or accountability.\n"
                 f"Current aggregate score: {scores.aggregate}\n"
                 f"Primary gap: {gap}\n"
             ),
@@ -87,6 +111,16 @@ class LocalOracle(Oracle):
         routes.append(route)
         self._save_routes(routes)
         return route
+
+    def _rank_routes(self, routes: list[dict], gap: str) -> list[dict]:
+        return sorted(routes, key=lambda route: self._route_priority(route, gap), reverse=True)
+
+    def _route_priority(self, route: dict, gap: str) -> tuple[int, int, float]:
+        text = " ".join(str(route.get(key, "")) for key in ("title", "rationale", "body")).lower()
+        l5_signal = 1 if str(route.get("target_signal", "")) in L5_SIGNALS else 0
+        keyword_hits = sum(1 for keyword in L5_KEYWORDS if keyword in text)
+        gap_bonus = 1 if "l5" in gap.lower() and l5_signal else 0
+        return (l5_signal + gap_bonus, keyword_hits, float(route.get("expected_delta", 0.0)))
 
     def _route_to_hypothesis(self, route: dict, scores: CapabilityScores, gap: str) -> Hypothesis:
         return Hypothesis(
@@ -103,20 +137,44 @@ class LocalOracle(Oracle):
     def _default_routes() -> list[dict]:
         return [
             {
-                "title": "Increase benchmark observability",
-                "rationale": "APEX should improve measurement before trusting self-edits.",
-                "target_signal": "verification_coverage",
-                "expected_delta": 0.05,
-                "body": "# Proposal: improve benchmark observability\nAdd richer benchmark signals before attempting autonomous code mutation.\nCurrent aggregate score: {aggregate}\nPrimary gap: {gap}\n",
-                "source": "default",
-            },
-            {
                 "title": "Add L5 coordination benchmark",
                 "rationale": "The largest gap is organizational coordination, so APEX needs a benchmark that measures delegated workflows.",
                 "target_signal": "coordination_score",
                 "expected_delta": 0.08,
                 "body": "# Proposal: add L5 coordination benchmark\nDefine a repeatable scenario where APEX plans owners, dependencies, status checks, and completion evidence.\nScore whether each dependency has an accountable owner and measurable completion criteria.\nPrimary gap: {gap}\n",
                 "source": "default",
+            },
+            {
+                "title": "Add sub-agent team operating model",
+                "rationale": "L5 organizers need to coordinate teams of specialized sub-agents with delegated responsibilities and escalation paths.",
+                "target_signal": "coordination_score",
+                "expected_delta": 0.1,
+                "body": "# Proposal: add sub-agent team operating model\nDefine sub-agent roles for planner, executor, verifier, reviewer, and coordinator.\nRoute work through delegated responsibilities, escalation rules, and completion evidence.\nPrimary gap: {gap}\n",
+                "source": "default_l5",
+            },
+            {
+                "title": "Add executive decision ledger",
+                "rationale": "Organization-scale AI must make and audit high-level decisions across complex processes.",
+                "target_signal": "accountability_score",
+                "expected_delta": 0.09,
+                "body": "# Proposal: add executive decision ledger\nRecord high-level decisions, decision owner, alternatives considered, expected impact, risk, and verification evidence.\nUse the ledger to coordinate large-scale operations and review accountability.\nPrimary gap: {gap}\n",
+                "source": "default_l5",
+            },
+            {
+                "title": "Add multi-workstream orchestration map",
+                "rationale": "L5 requires managing several workstreams at once, including dependencies, owners, blockers, and delivery gates.",
+                "target_signal": "coordination_score",
+                "expected_delta": 0.1,
+                "body": "# Proposal: add multi-workstream orchestration map\nTrack workstreams, sub-agent owners, dependencies, blockers, status, and next decisions.\nPrioritize actions that unblock the most organization-level work.\nPrimary gap: {gap}\n",
+                "source": "default_l5",
+            },
+            {
+                "title": "Add process portfolio coordinator",
+                "rationale": "An L5 organizer must coordinate a portfolio of processes, not just isolated tasks.",
+                "target_signal": "measured_gain",
+                "expected_delta": 0.08,
+                "body": "# Proposal: add process portfolio coordinator\nGroup objectives into a portfolio of operational processes with priority, owner, health, and expected outcome.\nSelect next actions based on portfolio-level risk and value.\nPrimary gap: {gap}\n",
+                "source": "default_l5",
             },
             {
                 "title": "Add accountability signal audit",
