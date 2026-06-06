@@ -29,3 +29,12 @@ def validate_patch_safety(code):
     if len(code.strip()) < 10:
         found.append('patch_too_short')
     return found
+
+
+def signal_saturation(capabilities, cap=0.80):
+    totals = {}
+    for c in capabilities:
+        sig = str(c.get('target_signal', ''))
+        delta = float(c.get('expected_delta', 0.0))
+        totals[sig] = totals.get(sig, 0.0) + delta
+    return {sig for sig, total in totals.items() if total >= cap}

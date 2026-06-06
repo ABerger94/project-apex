@@ -64,7 +64,14 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'rationale': 'Continuous autonomy should stop when cycles fail to make accepted progress, then '
                'explain what blocked progress.',
   'target_signal': 'execution_success',
-  'title': 'Add autonomous stop condition'}]
+  'title': 'Add autonomous stop condition'},
+ {'evidence': "Code patch applied to ['core/extensions.py']; tests passed; committed.",
+  'expected_delta': 0.07,
+  'id': 'add-accountability-signal-audit',
+  'implemented_at': '2026-06-06T18:34:49.444670+00:00',
+  'rationale': 'L5 requires organization-level accountability, not just individual task execution.',
+  'target_signal': 'accountability_score',
+  'title': 'Add accountability signal audit'}]
 
 
 def capability_signals() -> dict[str, float]:
