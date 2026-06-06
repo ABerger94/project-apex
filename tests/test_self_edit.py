@@ -29,6 +29,42 @@ class SelfEditTests(unittest.TestCase):
             self.assertEqual(result.reason, "duplicate_proposal")
             self.assertEqual(result.proposal_path, first_path)
 
+    def test_hypothesis_writes_functional_capability_code(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "levels").mkdir()
+            capability_path = root / "levels" / "l5_capabilities.py"
+            capability_path.write_text(
+                "\n".join([
+                    "from __future__ import annotations",
+                    "",
+                    "",
+                    "CAPABILITIES = []",
+                    "",
+                    "",
+                    "def capability_signals() -> dict[str, float]:",
+                    "    return {}",
+                    "",
+                ]),
+                encoding="utf-8",
+            )
+            config = SandboxConfig(proposal_dir=root / "self_edit" / "proposals")
+            engine = SelfEditEngine(root, config)
+            hypothesis = Hypothesis(
+                title="Add L5 coordination benchmark",
+                rationale="Improve coordination.",
+                target_signal="coordination_score",
+                expected_delta=0.08,
+                proposed_patch="# Proposal: add L5 coordination benchmark",
+            )
+
+            changed = engine._apply_implementation(hypothesis)
+            capabilities = engine._read_capabilities(capability_path)
+
+            self.assertEqual(changed, [capability_path])
+            self.assertEqual(capabilities[0]["target_signal"], "coordination_score")
+            self.assertEqual(capabilities[0]["expected_delta"], 0.08)
+
 
 if __name__ == "__main__":
     unittest.main()

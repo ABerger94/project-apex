@@ -32,6 +32,7 @@ def run_cycle(cycle_number: int) -> dict:
             "commit_hash": result.commit_hash,
             "result_reason": result.reason,
             "proposal_path": str(result.proposal_path.relative_to(CONFIG.root)),
+            "changed_paths": [str(path.relative_to(CONFIG.root)) for path in result.changed_paths],
         }
         attempts.append(attempt)
         if result.accepted or result.reason != "duplicate_proposal":
@@ -54,6 +55,7 @@ def run_cycle(cycle_number: int) -> dict:
         "commit_hash": result.commit_hash,
         "result_reason": result.reason,
         "proposal_path": str(result.proposal_path.relative_to(CONFIG.root)),
+        "changed_paths": [str(path.relative_to(CONFIG.root)) for path in result.changed_paths],
         "attempts": attempts,
     }
     append_memory(event)

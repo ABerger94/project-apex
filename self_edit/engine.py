@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ast
+import pprint
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -16,6 +18,7 @@ class EditResult:
     test_output: str
     proposal_path: Path
     reason: str = ""
+    changed_paths: tuple[Path, ...] = ()
 
 
 class SelfEditEngine:
@@ -36,20 +39,24 @@ class SelfEditEngine:
             )
 
         proposal_path = self._write_proposal(hypothesis)
+        changed_paths = [proposal_path]
+        implementation_result = self._apply_implementation(hypothesis)
+        changed_paths.extend(implementation_result)
         test_result = self._run_tests()
         output = (test_result.stdout or "") + (test_result.stderr or "")
 
         if test_result.returncode != 0:
-            self._git(["checkout", "--", str(proposal_path.relative_to(self.root))])
-            return EditResult(False, None, output, proposal_path, "tests_failed")
+            for changed_path in changed_paths:
+                self._git(["checkout", "--", str(changed_path.relative_to(self.root))])
+            return EditResult(False, None, output, proposal_path, "tests_failed", tuple(changed_paths))
 
-        self._git(["add", str(proposal_path.relative_to(self.root))])
-        commit = self._git(["commit", "-m", f"APEX proposal: {hypothesis.title}"])
+        self._git(["add", *[str(path.relative_to(self.root)) for path in changed_paths]])
+        commit = self._git(["commit", "-m", f"APEX implementation: {hypothesis.title}"])
         if commit.returncode != 0:
-            return EditResult(False, None, output + commit.stderr, proposal_path, "commit_failed")
+            return EditResult(False, None, output + commit.stderr, proposal_path, "commit_failed", tuple(changed_paths))
 
         commit_hash = self._git(["rev-parse", "--short", "HEAD"]).stdout.strip()
-        return EditResult(True, commit_hash or None, output, proposal_path, "accepted")
+        return EditResult(True, commit_hash or None, output, proposal_path, "accepted", tuple(changed_paths))
 
     def _write_proposal(self, hypothesis: Hypothesis) -> Path:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -80,6 +87,68 @@ class SelfEditEngine:
             "```",
             "",
         ])
+
+    def _apply_implementation(self, hypothesis: Hypothesis) -> list[Path]:
+        capability_path = self.root / "levels" / "l5_capabilities.py"
+        capabilities = self._read_capabilities(capability_path)
+        capability_id = self._slug(hypothesis.title)
+        if any(item.get("id") == capability_id for item in capabilities):
+            return []
+
+        capabilities.append({
+            "id": capability_id,
+            "title": hypothesis.title,
+            "rationale": hypothesis.rationale,
+            "target_signal": hypothesis.target_signal,
+            "expected_delta": round(max(0.0, min(0.12, float(hypothesis.expected_delta))), 4),
+            "implemented_at": datetime.now(timezone.utc).isoformat(),
+            "evidence": "Implemented by SelfEditEngine from accepted hypothesis.",
+        })
+        self._write_capabilities(capability_path, capabilities)
+        return [capability_path]
+
+    def _read_capabilities(self, path: Path) -> list[dict]:
+        if not path.exists():
+            return []
+        source = path.read_text(encoding="utf-8")
+        marker = "CAPABILITIES = "
+        start = source.find(marker)
+        if start == -1:
+            return []
+        start += len(marker)
+        end = source.find("\n\n\n", start)
+        if end == -1:
+            return []
+        try:
+            value = ast.literal_eval(source[start:end].strip())
+        except (SyntaxError, ValueError):
+            return []
+        return value if isinstance(value, list) else []
+
+    def _write_capabilities(self, path: Path, capabilities: list[dict]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        body = pprint.pformat(capabilities, sort_dicts=True, width=100)
+        path.write_text(
+            "\n".join([
+                "from __future__ import annotations",
+                "",
+                "",
+                f"CAPABILITIES = {body}",
+                "",
+                "",
+                "def capability_signals() -> dict[str, float]:",
+                "    signals: dict[str, float] = {}",
+                "    for capability in CAPABILITIES:",
+                "        signal = str(capability.get(\"target_signal\", \"\"))",
+                "        if not signal:",
+                "            continue",
+                "        delta = float(capability.get(\"expected_delta\", 0.0))",
+                "        signals[signal] = min(1.0, signals.get(signal, 0.0) + max(0.0, delta))",
+                "    return signals",
+                "",
+            ]),
+            encoding="utf-8",
+        )
 
     def _run_tests(self) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
