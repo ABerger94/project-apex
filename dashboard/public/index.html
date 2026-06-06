@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APEX Command Center</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Autonomous Progressive Execution</p>
+          <h1>APEX Command Center</h1>
+        </div>
+        <div class="actions">
+          <button id="refreshBtn" class="secondary" type="button" title="Refresh dashboard">
+            <span aria-hidden="true">↻</span>
+            Refresh
+          </button>
+          <button id="runBtn" type="button" title="Run one APEX cycle">
+            <span aria-hidden="true">▶</span>
+            Run Cycle
+          </button>
+        </div>
+      </header>
+
+      <section class="metrics-grid" aria-label="Latest run metrics">
+        <article class="metric">
+          <span>Current Level</span>
+          <strong id="currentLevel">--</strong>
+        </article>
+        <article class="metric">
+          <span>L3 Agent</span>
+          <strong id="l3Score">--</strong>
+        </article>
+        <article class="metric">
+          <span>L4 Innovator</span>
+          <strong id="l4Score">--</strong>
+        </article>
+        <article class="metric">
+          <span>L5 Organizer</span>
+          <strong id="l5Score">--</strong>
+        </article>
+      </section>
+
+      <section class="layout">
+        <div class="main-column">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Runs</h2>
+              <span id="generatedAt" class="muted"></span>
+            </div>
+            <div id="runsList" class="runs-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Change Log</h2>
+              <span class="muted">Git history</span>
+            </div>
+            <div id="commitsList" class="commits-list"></div>
+          </section>
+        </div>
+
+        <aside class="side-column">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Latest Hypothesis</h2>
+            </div>
+            <div id="hypothesis" class="hypothesis"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Proposals</h2>
+            </div>
+            <div id="proposalsList" class="proposals-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Working Tree</h2>
+            </div>
+            <pre id="gitStatus" class="status-box"></pre>
+          </section>
+        </aside>
+      </section>
+
+      <section id="consolePanel" class="panel console-panel" hidden>
+        <div class="panel-head">
+          <h2>Run Output</h2>
+          <span id="runState" class="muted"></span>
+        </div>
+        <pre id="runOutput" class="console"></pre>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

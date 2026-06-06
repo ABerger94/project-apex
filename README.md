@@ -33,3 +33,13 @@ python apex_loop.py --cycles 1
 
 Base44 LLM calls are disabled unless `APEX_ORACLE_PROVIDER=base44` is set.
 Run `npm install` first if you want the Base44 Oracle adapter to call `base44.integrations.Core.InvokeLLM`.
+
+## Command Center
+
+Start the local dashboard:
+
+```powershell
+npm run dashboard
+```
+
+Open `http://localhost:4177` to view runs, proposals, Git commits, working tree status, and to launch a one-cycle APEX run.
