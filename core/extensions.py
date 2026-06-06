@@ -81,3 +81,21 @@ def detect_stagnation(events, window=5):
         'repeated_signals': len(signals_used) != len(set(signals_used)),
         'stagnating': len(accepted) < window // 2,
     }
+
+
+def audit_cycle(event):
+    attempts = event.get('attempts', [])
+    strategies = list({
+        a.get('repair', {}).get('strategy', '')
+        for a in attempts
+        if not a.get('accepted') and a.get('repair')
+    } - {''})
+    return {
+        'cycle': event.get('cycle'),
+        'gap_addressed': event.get('gap'),
+        'proposals_tried': len(attempts),
+        'accepted': event.get('accepted'),
+        'repair_strategies_used': strategies,
+        'accepted_signal': event.get('hypothesis', {}).get('target_signal'),
+        'commit': event.get('commit_hash'),
+    }

@@ -101,7 +101,15 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'implemented_at': '2026-06-06T18:57:56.532934+00:00',
   'rationale': 'APEX cannot progress toward L5 if it repeats proposals after rejection.',
   'target_signal': 'measured_gain',
-  'title': 'Add anti-stagnation proposal policy'}]
+  'title': 'Add anti-stagnation proposal policy'},
+ {'evidence': "Code patch applied to ['core/extensions.py']; tests passed; committed.",
+  'expected_delta': 0.06,
+  'id': 'add-organization-level-run-review',
+  'implemented_at': '2026-06-06T18:57:56.921178+00:00',
+  'rationale': 'APEX needs to evaluate whether a cycle improved organizational execution rather '
+               'than only producing an artifact.',
+  'target_signal': 'accountability_score',
+  'title': 'Add organization-level run review'}]
 
 
 def capability_signals() -> dict[str, float]:
