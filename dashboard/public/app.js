@@ -1,6 +1,7 @@
 const stateUrl = "/api/state";
 const runUrl = "/api/run";
 const scheduleUrl = "/api/schedule";
+const chatUrl = "/api/chat";
 
 const els = {
   currentLevel: document.querySelector("#currentLevel"),
@@ -23,6 +24,11 @@ const els = {
   scheduleStatus: document.querySelector("#scheduleStatus"),
   nextRun: document.querySelector("#nextRun"),
   lastRun: document.querySelector("#lastRun"),
+  chatForm: document.querySelector("#chatForm"),
+  chatInput: document.querySelector("#chatInput"),
+  chatSendBtn: document.querySelector("#chatSendBtn"),
+  chatMessages: document.querySelector("#chatMessages"),
+  chatProvider: document.querySelector("#chatProvider"),
   consolePanel: document.querySelector("#consolePanel"),
   runOutput: document.querySelector("#runOutput"),
   runState: document.querySelector("#runState"),
@@ -208,8 +214,50 @@ async function updateSchedule(payload) {
   els.runOutput.textContent = JSON.stringify(data.scheduler || data, null, 2);
 }
 
+function addChatMessage(role, text, meta = "") {
+  const message = document.createElement("div");
+  message.className = `chat-message ${role}`;
+  message.innerHTML = `
+    <div class="chat-role">${role === "user" ? "You" : "APEX"}</div>
+    <pre>${escapeHtml(text)}</pre>
+    ${meta ? `<p class="muted">${escapeHtml(meta)}</p>` : ""}
+  `;
+  els.chatMessages.appendChild(message);
+  els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
+}
+
+async function askChat(event) {
+  event.preventDefault();
+  const message = els.chatInput.value.trim();
+  if (!message) return;
+
+  els.chatInput.value = "";
+  els.chatSendBtn.disabled = true;
+  addChatMessage("user", message);
+  addChatMessage("assistant", "Thinking from current APEX context...");
+
+  try {
+    const response = await fetch(chatUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+    const data = await response.json();
+    els.chatMessages.lastElementChild.remove();
+    const citations = data.citations?.length ? `Sources: ${data.citations.join(", ")}` : "";
+    els.chatProvider.textContent = data.provider || "local";
+    addChatMessage("assistant", data.answer || data.error || "No answer returned.", citations);
+  } catch (error) {
+    els.chatMessages.lastElementChild.remove();
+    addChatMessage("assistant", error.message);
+  } finally {
+    els.chatSendBtn.disabled = false;
+  }
+}
+
 els.refreshBtn.addEventListener("click", refresh);
 els.runBtn.addEventListener("click", runCycle);
+els.chatForm.addEventListener("submit", askChat);
 els.startIntervalBtn.addEventListener("click", () => {
   updateSchedule({ action: "start", mode: "interval", intervalMs: intervalMsFromControls() });
 });

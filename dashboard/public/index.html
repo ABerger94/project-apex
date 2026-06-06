@@ -91,6 +91,18 @@
         </div>
 
         <aside class="side-column">
+          <section class="panel chat-panel">
+            <div class="panel-head">
+              <h2>APEX Chat</h2>
+              <span id="chatProvider" class="muted">Local</span>
+            </div>
+            <div id="chatMessages" class="chat-messages"></div>
+            <form id="chatForm" class="chat-form">
+              <textarea id="chatInput" rows="3" placeholder="Ask about thoughts, logs, commits, scheduler, proposals, or scores"></textarea>
+              <button id="chatSendBtn" type="submit">Ask</button>
+            </form>
+          </section>
+
           <section class="panel">
             <div class="panel-head">
               <h2>Latest Hypothesis</h2>

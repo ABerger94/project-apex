@@ -8,6 +8,8 @@ const root = path.resolve(__dirname, "..");
 const publicDir = path.join(__dirname, "public");
 const port = Number(process.env.APEX_DASHBOARD_PORT || 4177);
 const minIntervalMs = 60 * 1000;
+const continuousCooldownMs = Number(process.env.APEX_CONTINUOUS_COOLDOWN_MS || minIntervalMs);
+const maxDashboardItems = Number(process.env.APEX_DASHBOARD_MAX_ITEMS || 50);
 
 const scheduler = {
   enabled: false,
@@ -128,6 +130,24 @@ function readProposals() {
     .sort((a, b) => b.modified.localeCompare(a.modified));
 }
 
+function readSourceSummary() {
+  const files = [
+    "apex_loop.py",
+    "config.py",
+    "metrics.py",
+    "core/oracle.py",
+    "self_edit/engine.py",
+    "levels/l3_agent.py",
+  ];
+  return files.map((relativePath) => {
+    const content = safeRead(path.join(root, relativePath));
+    return {
+      path: relativePath,
+      preview: content.split(/\r?\n/).slice(0, 80).join("\n"),
+    };
+  });
+}
+
 async function gitCommits() {
   const result = await run("git", ["log", "--oneline", "--decorate", "-12"]);
   return result.stdout
@@ -145,16 +165,29 @@ async function gitStatus() {
 }
 
 async function dashboardState() {
-  const events = readEvents();
+  const events = readEvents().slice(0, maxDashboardItems);
   const latest = events[0] || null;
   return {
     latest,
     events,
-    proposals: readProposals(),
+    proposals: readProposals().slice(0, maxDashboardItems),
     commits: await gitCommits(),
     status: await gitStatus(),
     scheduler: schedulerState(),
     generatedAt: new Date().toISOString(),
+  };
+}
+
+async function knowledgePack() {
+  const state = await dashboardState();
+  return {
+    latest: state.latest,
+    recentEvents: state.events.slice(0, 8),
+    proposals: state.proposals.slice(0, 8),
+    commits: state.commits,
+    status: state.status,
+    scheduler: state.scheduler,
+    source: readSourceSummary(),
   };
 }
 
@@ -195,7 +228,7 @@ async function executeApexCycle(trigger = "manual") {
   };
 
   if (scheduler.enabled && scheduler.mode === "continuous") {
-    scheduleNextRun(0);
+    scheduleNextRun(Math.max(minIntervalMs, continuousCooldownMs));
   } else if (scheduler.enabled && scheduler.mode === "interval") {
     scheduleNextRun(scheduler.intervalMs);
   }
@@ -275,6 +308,135 @@ async function updateSchedule(req, res) {
   sendJson(res, 400, { ok: false, error: "Unknown schedule action." });
 }
 
+function answerLocally(question, context) {
+  const normalized = question.toLowerCase();
+  const latest = context.latest;
+  const scores = latest?.scores || {};
+  const lines = [];
+
+  if (!latest) {
+    return "I do not have any recorded APEX runs yet. Run a cycle first, then ask again.";
+  }
+
+  if (normalized.includes("thought") || normalized.includes("thinking") || normalized.includes("process") || normalized.includes("hypothesis")) {
+    lines.push(`Latest hypothesis: ${latest.hypothesis?.title || "unknown"}.`);
+    lines.push(`Rationale: ${latest.hypothesis?.rationale || "not recorded"}.`);
+    lines.push(`The current target signal is ${latest.hypothesis?.target_signal || "unknown"} with expected delta ${latest.hypothesis?.expected_delta ?? "unknown"}.`);
+  } else if (normalized.includes("log") || normalized.includes("run") || normalized.includes("history")) {
+    lines.push(`I have ${context.recentEvents.length} recent run records loaded.`);
+    for (const event of context.recentEvents.slice(0, 5)) {
+      lines.push(`Cycle ${event.cycle} at ${event.timestamp}: ${event.accepted ? "accepted" : "rejected"}, level ${event.current_level}, gap ${event.gap}, commit ${event.commit_hash || "none"}.`);
+    }
+  } else if (normalized.includes("commit") || normalized.includes("change")) {
+    lines.push("Recent commits:");
+    for (const commit of context.commits.slice(0, 8)) {
+      lines.push(`${commit.hash}: ${commit.message}`);
+    }
+  } else if (normalized.includes("schedule") || normalized.includes("interval") || normalized.includes("continuous")) {
+    const schedulerInfo = context.scheduler;
+    lines.push(`Scheduler mode: ${schedulerInfo.mode}. Enabled: ${schedulerInfo.enabled}. Running: ${schedulerInfo.running}.`);
+    lines.push(`Interval: ${schedulerInfo.intervalMs} ms. Next run: ${schedulerInfo.nextRunAt || "none"}. Last finish: ${schedulerInfo.lastFinishedAt || "none"}.`);
+  } else if (normalized.includes("score") || normalized.includes("level") || normalized.includes("gap")) {
+    lines.push(`Current level: ${latest.current_level}.`);
+    lines.push(`Scores: L3 ${scores.l3_agent}, L4 ${scores.l4_innovator}, L5 ${scores.l5_organizer}.`);
+    lines.push(`Largest gap: ${latest.gap}.`);
+  } else {
+    lines.push(`Current level is ${latest.current_level}; largest gap is ${latest.gap}.`);
+    lines.push(`Latest hypothesis is "${latest.hypothesis?.title || "unknown"}".`);
+    lines.push(`Latest accepted commit is ${latest.commit_hash || "none"}.`);
+    lines.push("Ask about thoughts, logs, commits, scheduler, scores, proposals, or source modules for a narrower answer.");
+  }
+
+  if (context.status.length) {
+    lines.push(`Working tree has ${context.status.length} pending item(s): ${context.status.join("; ")}`);
+  } else {
+    lines.push("Working tree is clean.");
+  }
+
+  return lines.join("\n");
+}
+
+async function answerWithBase44(question, context) {
+  const appId = process.env.BASE44_APP_ID || process.env.VITE_BASE44_APP_ID;
+  if (!appId || process.env.APEX_CHAT_PROVIDER !== "base44") return null;
+
+  const prompt = [
+    "You are the APEX Command Center assistant.",
+    "Answer only from the provided APEX context. If information is not present, say so.",
+    "Be concise and operational. Distinguish recorded state from inference.",
+    "",
+    `Question: ${question}`,
+    "",
+    `APEX context:\n${JSON.stringify(context, null, 2)}`,
+  ].join("\n");
+
+  const schema = {
+    answer: "string",
+    citations: "array of strings naming files, logs, commits, or state fields used",
+  };
+  const script = [
+    "const { createClient } = require('@base44/sdk');",
+    "const input = JSON.parse(process.argv[1]);",
+    "const client = createClient({ appId: process.env.BASE44_APP_ID || process.env.VITE_BASE44_APP_ID, token: process.env.BASE44_ACCESS_TOKEN, serverUrl: '', requiresAuth: false });",
+    "client.integrations.Core.InvokeLLM({ prompt: input.prompt, response_json_schema: input.schema })",
+    ".then(r => console.log(JSON.stringify(r)))",
+    ".catch(e => { console.error(e.message || String(e)); process.exit(2); });",
+  ].join("");
+
+  const result = await run("node", ["-e", script, JSON.stringify({ prompt, schema })], {
+    env: process.env,
+  });
+  if (result.code !== 0) {
+    return {
+      answer: `Base44 chat failed, so I am using local context instead.\n\n${answerLocally(question, context)}`,
+      citations: ["dashboard/server.js", "local fallback"],
+      provider: "local-fallback",
+      error: result.stderr,
+    };
+  }
+
+  try {
+    const data = JSON.parse(result.stdout);
+    return {
+      answer: String(data.answer || ""),
+      citations: Array.isArray(data.citations) ? data.citations : [],
+      provider: "base44",
+    };
+  } catch {
+    return {
+      answer: result.stdout.trim() || answerLocally(question, context),
+      citations: ["Base44 raw response"],
+      provider: "base44",
+    };
+  }
+}
+
+async function chat(req, res) {
+  const body = await readBody(req);
+  const question = String(body.message || body.question || "").trim();
+  if (!question) return sendJson(res, 400, { ok: false, error: "Message is required." });
+
+  const context = await knowledgePack();
+  const llmAnswer = await answerWithBase44(question, context);
+  const payload = llmAnswer || {
+    answer: answerLocally(question, context),
+    citations: ["memory/episodic_log.jsonl", "git log", "scheduler state", "self_edit/proposals"],
+    provider: "local",
+  };
+
+  sendJson(res, 200, {
+    ok: true,
+    question,
+    ...payload,
+    contextStats: {
+      runs: context.recentEvents.length,
+      proposals: context.proposals.length,
+      commits: context.commits.length,
+      sourceFiles: context.source.length,
+    },
+  });
+}
+
 function serveStatic(req, res) {
   const requestPath = url.parse(req.url).pathname;
   const fileName = requestPath === "/" ? "index.html" : requestPath.slice(1);
@@ -298,6 +460,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === "POST" && req.url.startsWith("/api/schedule")) {
     return updateSchedule(req, res);
+  }
+  if (req.method === "POST" && req.url.startsWith("/api/chat")) {
+    return chat(req, res);
   }
   if (req.method === "POST" && req.url.startsWith("/api/run")) {
     return runApexCycle(req, res);
