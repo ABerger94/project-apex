@@ -46,7 +46,22 @@ function time(value) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    second: "2-digit",
   }).format(new Date(value));
+}
+
+function durationUntil(value) {
+  if (!value) return "--";
+  const ms = new Date(value).getTime() - Date.now();
+  if (ms <= 0) return "due now";
+  const seconds = Math.ceil(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
 }
 
 function escapeHtml(value) {
@@ -149,13 +164,13 @@ function renderScheduler(scheduler) {
   const active = scheduler?.enabled;
   const running = scheduler?.running;
   const mode = scheduler?.mode || "stopped";
-  const label = running ? "Running" : active ? (mode === "continuous" ? "Continuous" : "Interval") : "Stopped";
+  const label = running ? "Running now" : active ? (mode === "continuous" ? "Continuous active" : "Interval active") : "Stopped";
   els.scheduleStatus.textContent = label;
   els.scheduleStatus.className = `muted schedule-state ${active ? "active" : ""}`;
-  els.nextRun.textContent = `Next run: ${scheduler?.nextRunAt ? time(scheduler.nextRunAt) : "--"}`;
+  els.nextRun.textContent = `Next run: ${scheduler?.nextRunAt ? `${time(scheduler.nextRunAt)} (${durationUntil(scheduler.nextRunAt)})` : "--"}`;
   els.lastRun.textContent = `Last run: ${scheduler?.lastFinishedAt ? time(scheduler.lastFinishedAt) : "--"}`;
-  els.startIntervalBtn.disabled = running;
-  els.startContinuousBtn.disabled = running;
+  els.startIntervalBtn.disabled = active || running;
+  els.startContinuousBtn.disabled = active || running;
   els.stopScheduleBtn.disabled = !active;
 }
 

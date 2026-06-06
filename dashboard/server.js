@@ -7,6 +7,7 @@ const url = require("node:url");
 const root = path.resolve(__dirname, "..");
 const publicDir = path.join(__dirname, "public");
 const port = Number(process.env.APEX_DASHBOARD_PORT || 4177);
+const schedulerStatePath = path.join(root, "memory", "scheduler_state.json");
 const minIntervalMs = 60 * 1000;
 const continuousCooldownMs = Number(process.env.APEX_CONTINUOUS_COOLDOWN_MS || minIntervalMs);
 const maxDashboardItems = Number(process.env.APEX_DASHBOARD_MAX_ITEMS || 50);
@@ -22,6 +23,28 @@ const scheduler = {
   nextRunAt: null,
   lastResult: null,
 };
+
+function persistSchedulerState() {
+  const dir = path.dirname(schedulerStatePath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(schedulerStatePath, JSON.stringify(schedulerState(), null, 2), "utf8");
+}
+
+function loadSchedulerState() {
+  try {
+    const saved = JSON.parse(safeRead(schedulerStatePath, "{}"));
+    scheduler.enabled = Boolean(saved.enabled);
+    scheduler.mode = saved.enabled ? (saved.mode === "continuous" ? "continuous" : "interval") : "stopped";
+    scheduler.intervalMs = Math.max(minIntervalMs, Number(saved.intervalMs) || scheduler.intervalMs);
+    scheduler.running = false;
+    scheduler.lastStartedAt = saved.lastStartedAt || null;
+    scheduler.lastFinishedAt = saved.lastFinishedAt || null;
+    scheduler.lastResult = saved.lastResult || null;
+  } catch {
+    scheduler.enabled = false;
+    scheduler.mode = "stopped";
+  }
+}
 
 function sendJson(res, status, data) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -232,6 +255,7 @@ async function executeApexCycle(trigger = "manual") {
     trigger,
     finishedAt: scheduler.lastFinishedAt,
   };
+  persistSchedulerState();
 
   if (scheduler.enabled && scheduler.mode === "continuous") {
     scheduleNextRun(Math.max(minIntervalMs, continuousCooldownMs));
@@ -257,6 +281,7 @@ function clearSchedulerTimer() {
     scheduler.timer = null;
   }
   scheduler.nextRunAt = null;
+  persistSchedulerState();
 }
 
 function scheduleNextRun(delayMs) {
@@ -265,6 +290,7 @@ function scheduleNextRun(delayMs) {
 
   const safeDelay = Math.max(0, delayMs);
   scheduler.nextRunAt = new Date(Date.now() + safeDelay).toISOString();
+  persistSchedulerState();
   scheduler.timer = setTimeout(async () => {
     scheduler.timer = null;
     scheduler.nextRunAt = null;
@@ -282,12 +308,14 @@ function startScheduler(mode, intervalMs) {
     scheduler.mode = "continuous";
     scheduleNextRun(0);
   }
+  persistSchedulerState();
 }
 
 function stopScheduler() {
   scheduler.enabled = false;
   scheduler.mode = "stopped";
   clearSchedulerTimer();
+  persistSchedulerState();
 }
 
 async function runApexCycle(req, res) {
@@ -540,6 +568,13 @@ const server = http.createServer(async (req, res) => {
   }
   return serveStatic(req, res);
 });
+
+loadSchedulerState();
+if (scheduler.enabled && scheduler.mode === "continuous") {
+  scheduleNextRun(Math.max(minIntervalMs, continuousCooldownMs));
+} else if (scheduler.enabled && scheduler.mode === "interval") {
+  scheduleNextRun(scheduler.intervalMs);
+}
 
 server.listen(port, () => {
   console.log(`APEX command center running at http://localhost:${port}`);
