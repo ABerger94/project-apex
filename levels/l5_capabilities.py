@@ -79,7 +79,14 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'rationale': 'L5 behavior needs explicit dependency tracking across workstreams before it can '
                'coordinate organization-scale execution.',
   'target_signal': 'coordination_score',
-  'title': 'Add L5 dependency map'}]
+  'title': 'Add L5 dependency map'},
+ {'evidence': "Code patch applied to ['core/extensions.py']; tests passed; committed.",
+  'expected_delta': 0.08,
+  'id': 'add-process-portfolio-coordinator',
+  'implemented_at': '2026-06-06T18:34:50.036462+00:00',
+  'rationale': 'An L5 organizer must coordinate a portfolio of processes, not just isolated tasks.',
+  'target_signal': 'measured_gain',
+  'title': 'Add process portfolio coordinator'}]
 
 
 def capability_signals() -> dict[str, float]:

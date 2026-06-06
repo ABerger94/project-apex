@@ -46,3 +46,14 @@ def rank_objectives_by_impact(objectives):
         key=lambda o: o.get('target_score', 0) - o.get('current_score', 0),
         reverse=True,
     )
+
+
+def verify_gain(before, after):
+    keys = ('l3_agent', 'l4_innovator', 'l5_organizer')
+    d = lambda k: round(after.get(k, 0) - before.get(k, 0), 4)
+    return {
+        'l3_delta': d('l3_agent'),
+        'l4_delta': d('l4_innovator'),
+        'l5_delta': d('l5_organizer'),
+        'improved': sum(after.get(k, 0) for k in keys) > sum(before.get(k, 0) for k in keys),
+    }
