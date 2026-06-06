@@ -1,5 +1,6 @@
 const stateUrl = "/api/state";
 const runUrl = "/api/run";
+const scheduleUrl = "/api/schedule";
 
 const els = {
   currentLevel: document.querySelector("#currentLevel"),
@@ -14,6 +15,14 @@ const els = {
   gitStatus: document.querySelector("#gitStatus"),
   refreshBtn: document.querySelector("#refreshBtn"),
   runBtn: document.querySelector("#runBtn"),
+  intervalValue: document.querySelector("#intervalValue"),
+  intervalUnit: document.querySelector("#intervalUnit"),
+  startIntervalBtn: document.querySelector("#startIntervalBtn"),
+  startContinuousBtn: document.querySelector("#startContinuousBtn"),
+  stopScheduleBtn: document.querySelector("#stopScheduleBtn"),
+  scheduleStatus: document.querySelector("#scheduleStatus"),
+  nextRun: document.querySelector("#nextRun"),
+  lastRun: document.querySelector("#lastRun"),
   consolePanel: document.querySelector("#consolePanel"),
   runOutput: document.querySelector("#runOutput"),
   runState: document.querySelector("#runState"),
@@ -64,7 +73,7 @@ function renderRuns(events) {
           <div class="run-top">
             <div>
               <strong>Cycle ${escapeHtml(event.cycle)}</strong>
-              <p class="muted">${time(event.timestamp)} · ${escapeHtml(event.current_level || "Unknown")}</p>
+              <p class="muted">${time(event.timestamp)} | ${escapeHtml(event.current_level || "Unknown")}</p>
             </div>
             <span class="badge ${event.accepted ? "ok" : "fail"}">${accepted}</span>
           </div>
@@ -90,7 +99,7 @@ function renderHypothesis(latest) {
   els.hypothesis.innerHTML = `
     <h3>${escapeHtml(hypothesis.title)}</h3>
     <p>${escapeHtml(hypothesis.rationale)}</p>
-    <p><strong>Target:</strong> ${escapeHtml(hypothesis.target_signal)} · <strong>Expected:</strong> ${pct(hypothesis.expected_delta)}</p>
+    <p><strong>Target:</strong> ${escapeHtml(hypothesis.target_signal)} | <strong>Expected:</strong> ${pct(hypothesis.expected_delta)}</p>
     <p class="muted">${escapeHtml(latest.proposal_path || "")}</p>
   `;
 }
@@ -119,7 +128,7 @@ function renderProposals(proposals) {
     .map((proposal) => `
       <article class="proposal">
         <strong>${escapeHtml(proposal.name)}</strong>
-        <p class="muted">${time(proposal.modified)} · ${escapeHtml(proposal.path)}</p>
+        <p class="muted">${time(proposal.modified)} | ${escapeHtml(proposal.path)}</p>
         <pre>${escapeHtml(proposal.preview)}</pre>
       </article>
     `)
@@ -130,6 +139,20 @@ function renderStatus(status) {
   els.gitStatus.textContent = status.length ? status.join("\n") : "Clean";
 }
 
+function renderScheduler(scheduler) {
+  const active = scheduler?.enabled;
+  const running = scheduler?.running;
+  const mode = scheduler?.mode || "stopped";
+  const label = running ? "Running" : active ? (mode === "continuous" ? "Continuous" : "Interval") : "Stopped";
+  els.scheduleStatus.textContent = label;
+  els.scheduleStatus.className = `muted schedule-state ${active ? "active" : ""}`;
+  els.nextRun.textContent = `Next run: ${scheduler?.nextRunAt ? time(scheduler.nextRunAt) : "--"}`;
+  els.lastRun.textContent = `Last run: ${scheduler?.lastFinishedAt ? time(scheduler.lastFinishedAt) : "--"}`;
+  els.startIntervalBtn.disabled = running;
+  els.startContinuousBtn.disabled = running;
+  els.stopScheduleBtn.disabled = !active;
+}
+
 function render(data) {
   renderMetrics(data.latest);
   renderRuns(data.events || []);
@@ -137,6 +160,7 @@ function render(data) {
   renderCommits(data.commits || []);
   renderProposals(data.proposals || []);
   renderStatus(data.status || []);
+  renderScheduler(data.scheduler || {});
   els.generatedAt.textContent = `Updated ${time(data.generatedAt)}`;
 }
 
@@ -164,6 +188,36 @@ async function runCycle() {
   }
 }
 
+function intervalMsFromControls() {
+  const value = Math.max(1, Number(els.intervalValue.value) || 1);
+  const multiplier = els.intervalUnit.value === "minutes" ? 60 * 1000 : 60 * 60 * 1000;
+  return value * multiplier;
+}
+
+async function updateSchedule(payload) {
+  els.consolePanel.hidden = false;
+  els.runState.textContent = "Updating schedule";
+  const response = await fetch(scheduleUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (data.state) render(data.state);
+  els.runState.textContent = data.ok ? "Schedule updated" : "Schedule failed";
+  els.runOutput.textContent = JSON.stringify(data.scheduler || data, null, 2);
+}
+
 els.refreshBtn.addEventListener("click", refresh);
 els.runBtn.addEventListener("click", runCycle);
+els.startIntervalBtn.addEventListener("click", () => {
+  updateSchedule({ action: "start", mode: "interval", intervalMs: intervalMsFromControls() });
+});
+els.startContinuousBtn.addEventListener("click", () => {
+  updateSchedule({ action: "start", mode: "continuous" });
+});
+els.stopScheduleBtn.addEventListener("click", () => {
+  updateSchedule({ action: "stop" });
+});
 refresh();
+setInterval(refresh, 15000);

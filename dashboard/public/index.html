@@ -15,11 +15,11 @@
         </div>
         <div class="actions">
           <button id="refreshBtn" class="secondary" type="button" title="Refresh dashboard">
-            <span aria-hidden="true">↻</span>
+            <span aria-hidden="true">R</span>
             Refresh
           </button>
           <button id="runBtn" type="button" title="Run one APEX cycle">
-            <span aria-hidden="true">▶</span>
+            <span aria-hidden="true">Run</span>
             Run Cycle
           </button>
         </div>
@@ -42,6 +42,33 @@
           <span>L5 Organizer</span>
           <strong id="l5Score">--</strong>
         </article>
+      </section>
+
+      <section class="panel scheduler-panel">
+        <div class="panel-head">
+          <h2>Autonomous Scheduler</h2>
+          <span id="scheduleStatus" class="muted">Stopped</span>
+        </div>
+        <div class="scheduler-controls">
+          <label class="field">
+            <span>Run every</span>
+            <input id="intervalValue" type="number" min="1" step="1" value="1" />
+          </label>
+          <label class="field">
+            <span>Unit</span>
+            <select id="intervalUnit">
+              <option value="hours">Hours</option>
+              <option value="minutes">Minutes</option>
+            </select>
+          </label>
+          <button id="startIntervalBtn" type="button">Start Interval</button>
+          <button id="startContinuousBtn" class="secondary" type="button">Run Continuously</button>
+          <button id="stopScheduleBtn" class="danger" type="button">Stop</button>
+        </div>
+        <div class="scheduler-meta">
+          <span id="nextRun">Next run: --</span>
+          <span id="lastRun">Last run: --</span>
+        </div>
       </section>
 
       <section class="layout">

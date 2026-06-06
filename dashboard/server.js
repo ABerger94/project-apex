@@ -7,6 +7,19 @@ const url = require("node:url");
 const root = path.resolve(__dirname, "..");
 const publicDir = path.join(__dirname, "public");
 const port = Number(process.env.APEX_DASHBOARD_PORT || 4177);
+const minIntervalMs = 60 * 1000;
+
+const scheduler = {
+  enabled: false,
+  mode: "stopped",
+  intervalMs: 60 * 60 * 1000,
+  timer: null,
+  running: false,
+  lastStartedAt: null,
+  lastFinishedAt: null,
+  nextRunAt: null,
+  lastResult: null,
+};
 
 function sendJson(res, status, data) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -44,6 +57,23 @@ function run(command, args, options = {}) {
     });
     child.on("close", (code) => resolve({ code, stdout, stderr }));
     child.on("error", (error) => resolve({ code: 1, stdout, stderr: error.message }));
+  });
+}
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+    req.on("end", () => {
+      if (!body.trim()) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        resolve({});
+      }
+    });
   });
 }
 
@@ -123,21 +153,126 @@ async function dashboardState() {
     proposals: readProposals(),
     commits: await gitCommits(),
     status: await gitStatus(),
+    scheduler: schedulerState(),
     generatedAt: new Date().toISOString(),
   };
 }
 
-async function runApexCycle(req, res) {
+function schedulerState() {
+  return {
+    enabled: scheduler.enabled,
+    mode: scheduler.mode,
+    intervalMs: scheduler.intervalMs,
+    intervalHours: scheduler.intervalMs / (60 * 60 * 1000),
+    running: scheduler.running,
+    lastStartedAt: scheduler.lastStartedAt,
+    lastFinishedAt: scheduler.lastFinishedAt,
+    nextRunAt: scheduler.nextRunAt,
+    lastResult: scheduler.lastResult,
+  };
+}
+
+async function executeApexCycle(trigger = "manual") {
+  if (scheduler.running) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: "A cycle is already running.",
+      state: await dashboardState(),
+    };
+  }
+
+  scheduler.running = true;
+  scheduler.lastStartedAt = new Date().toISOString();
   const { command, argsPrefix } = pythonCommand();
   const result = await run(command, [...argsPrefix, "apex_loop.py", "--cycles", "1"]);
-  const state = await dashboardState();
-  sendJson(res, result.code === 0 ? 200 : 500, {
+  scheduler.running = false;
+  scheduler.lastFinishedAt = new Date().toISOString();
+  scheduler.lastResult = {
     ok: result.code === 0,
+    trigger,
+    finishedAt: scheduler.lastFinishedAt,
+  };
+
+  if (scheduler.enabled && scheduler.mode === "continuous") {
+    scheduleNextRun(0);
+  } else if (scheduler.enabled && scheduler.mode === "interval") {
+    scheduleNextRun(scheduler.intervalMs);
+  }
+
+  const state = await dashboardState();
+  return {
+    ok: result.code === 0,
+    skipped: false,
+    trigger,
     command: [command, ...argsPrefix, "apex_loop.py", "--cycles", "1"].join(" "),
     stdout: result.stdout,
     stderr: result.stderr,
     state,
-  });
+  };
+}
+
+function clearSchedulerTimer() {
+  if (scheduler.timer) {
+    clearTimeout(scheduler.timer);
+    scheduler.timer = null;
+  }
+  scheduler.nextRunAt = null;
+}
+
+function scheduleNextRun(delayMs) {
+  clearSchedulerTimer();
+  if (!scheduler.enabled) return;
+
+  const safeDelay = Math.max(0, delayMs);
+  scheduler.nextRunAt = new Date(Date.now() + safeDelay).toISOString();
+  scheduler.timer = setTimeout(async () => {
+    scheduler.timer = null;
+    scheduler.nextRunAt = null;
+    await executeApexCycle("scheduler");
+  }, safeDelay);
+}
+
+function startScheduler(mode, intervalMs) {
+  scheduler.enabled = true;
+  scheduler.mode = mode;
+  if (mode === "interval") {
+    scheduler.intervalMs = Math.max(minIntervalMs, Number(intervalMs) || scheduler.intervalMs);
+    scheduleNextRun(scheduler.intervalMs);
+  } else {
+    scheduler.mode = "continuous";
+    scheduleNextRun(0);
+  }
+}
+
+function stopScheduler() {
+  scheduler.enabled = false;
+  scheduler.mode = "stopped";
+  clearSchedulerTimer();
+}
+
+async function runApexCycle(req, res) {
+  const payload = await executeApexCycle("manual");
+  sendJson(res, payload.ok || payload.skipped ? 200 : 500, payload);
+}
+
+async function updateSchedule(req, res) {
+  const body = await readBody(req);
+  const action = String(body.action || "").toLowerCase();
+  const mode = String(body.mode || "interval").toLowerCase();
+  const intervalMs = Number(body.intervalMs);
+
+  if (action === "stop") {
+    stopScheduler();
+    return sendJson(res, 200, { ok: true, scheduler: schedulerState(), state: await dashboardState() });
+  }
+
+  if (action === "start") {
+    startScheduler(mode === "continuous" ? "continuous" : "interval", intervalMs);
+    return sendJson(res, 200, { ok: true, scheduler: schedulerState(), state: await dashboardState() });
+  }
+
+  sendJson(res, 400, { ok: false, error: "Unknown schedule action." });
 }
 
 function serveStatic(req, res) {
@@ -160,6 +295,9 @@ function serveStatic(req, res) {
 const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && req.url.startsWith("/api/state")) {
     return sendJson(res, 200, await dashboardState());
+  }
+  if (req.method === "POST" && req.url.startsWith("/api/schedule")) {
+    return updateSchedule(req, res);
   }
   if (req.method === "POST" && req.url.startsWith("/api/run")) {
     return runApexCycle(req, res);
