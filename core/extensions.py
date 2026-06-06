@@ -57,3 +57,15 @@ def verify_gain(before, after):
         'l5_delta': d('l5_organizer'),
         'improved': sum(after.get(k, 0) for k in keys) > sum(before.get(k, 0) for k in keys),
     }
+
+
+def gap_velocity(events):
+    from collections import defaultdict
+    totals, counts = defaultdict(float), defaultdict(int)
+    for ev in events:
+        if ev.get('accepted'):
+            gap = ev.get('gap', 'unknown')
+            delta = float(ev.get('hypothesis', {}).get('expected_delta', 0.0))
+            totals[gap] += delta
+            counts[gap] += 1
+    return {g: round(totals[g] / counts[g], 4) for g in totals}

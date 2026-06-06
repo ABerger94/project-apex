@@ -86,7 +86,15 @@ CAPABILITIES = [{'evidence': 'Implemented by SelfEditEngine from accepted hypoth
   'implemented_at': '2026-06-06T18:34:50.036462+00:00',
   'rationale': 'An L5 organizer must coordinate a portfolio of processes, not just isolated tasks.',
   'target_signal': 'measured_gain',
-  'title': 'Add process portfolio coordinator'}]
+  'title': 'Add process portfolio coordinator'},
+ {'evidence': "Code patch applied to ['core/extensions.py']; tests passed; committed.",
+  'expected_delta': 0.08,
+  'id': 'add-cross-cycle-goal-memory',
+  'implemented_at': '2026-06-06T18:34:50.301974+00:00',
+  'rationale': 'Progress toward L5 requires remembering active objectives across cycles instead of '
+               'evaluating each cycle in isolation.',
+  'target_signal': 'coordination_score',
+  'title': 'Add cross-cycle goal memory'}]
 
 
 def capability_signals() -> dict[str, float]:
