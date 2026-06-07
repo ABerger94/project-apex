@@ -77,6 +77,26 @@ class DashboardStateTests(unittest.TestCase):
             self.assertEqual(state["pending_plan"]["goal"], "Improve verification")
             self.assertEqual(state["pending_plan"]["plan"]["title"], "Tighten verifier")
 
+    def test_dashboard_state_includes_suggested_goals(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            suggested_path = root / "memory" / "suggested_goals.json"
+            suggested_path.parent.mkdir(parents=True, exist_ok=True)
+            suggested_path.write_text(json.dumps({
+                "goals": [
+                    {
+                        "priority": 1,
+                        "goal": "Improve self-assessment",
+                        "rationale": "It advances autonomy.",
+                    }
+                ]
+            }), encoding="utf-8")
+
+            state = dashboard_state(root)
+
+            self.assertEqual(state["suggested_goals"]["goals"][0]["goal"], "Improve self-assessment")
+
 
 if __name__ == "__main__":
     unittest.main()

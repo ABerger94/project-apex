@@ -286,6 +286,50 @@ textarea {
   min-height: 90px;
 }
 
+.suggested-goals {
+  display: grid;
+  gap: 8px;
+}
+
+.suggestion-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.goal-suggestion {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  min-height: 72px;
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 10px;
+  text-align: left;
+}
+
+.goal-suggestion span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--accent);
+  font-weight: 900;
+}
+
+.goal-suggestion p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 .planner-details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

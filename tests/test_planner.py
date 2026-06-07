@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from apex.core.planner import OllamaPlanner, build_planner_prompt
+from apex.core.planner import OllamaPlanner, build_goal_suggestion_prompt, build_planner_prompt
 from apex.core.context import read_repo_context
 from apex.core.memory import EventMemory
 from tests.helpers import init_repo
@@ -75,6 +75,48 @@ class PlannerTests(unittest.TestCase):
             self.assertIn("Recent memory events:", prompt)
             self.assertIn("Add insights module", prompt)
             self.assertIn("empty_git_diff", prompt)
+
+    def test_goal_suggestion_prompt_includes_memory_events(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            memory = EventMemory(root / "memory" / "events.jsonl")
+            memory.append("cycle_finished", {
+                "title": "Add level assessment",
+                "accepted": True,
+                "reason": "accepted",
+            })
+            context = read_repo_context(root)
+
+            prompt = build_goal_suggestion_prompt(context, memory.read_recent(), limit=3)
+
+            self.assertIn("APEX V2 autonomy goal selector", prompt)
+            self.assertIn("Add level assessment", prompt)
+            self.assertIn("Required JSON schema shape", prompt)
+
+    def test_ollama_planner_parses_goal_suggestions(self):
+        response = {
+            "goals": [
+                {
+                    "priority": 1,
+                    "goal": "Add current-level assessment report",
+                    "rationale": "It uses recent level assessment work to guide the next cycle.",
+                }
+            ]
+        }
+        transport = FakeTransport({"response": json.dumps(response)})
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            planner = OllamaPlanner(
+                endpoint="https://ollama.com/api/generate",
+                api_key="secret",
+                transport=transport,
+            )
+
+            suggestions = planner.suggest_goals(root)
+
+            self.assertEqual(suggestions["goals"][0]["goal"], "Add current-level assessment report")
 
     def test_ollama_planner_parses_strict_change_plan(self):
         plan_json = {

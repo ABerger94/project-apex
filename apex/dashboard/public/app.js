@@ -11,6 +11,7 @@ const phases = [
 
 const els = {
   refreshBtn: document.querySelector("#refreshBtn"),
+  suggestGoalsBtn: document.querySelector("#suggestGoalsBtn"),
   generatePlanBtn: document.querySelector("#generatePlanBtn"),
   runPlanBtn: document.querySelector("#runPlanBtn"),
   clearPlanBtn: document.querySelector("#clearPlanBtn"),
@@ -24,6 +25,7 @@ const els = {
   workingTree: document.querySelector("#workingTree"),
   plannerModel: document.querySelector("#plannerModel"),
   plannerDetails: document.querySelector("#plannerDetails"),
+  suggestedGoals: document.querySelector("#suggestedGoals"),
   stateSource: document.querySelector("#stateSource"),
   objectiveText: document.querySelector("#objectiveText"),
   levelList: document.querySelector("#levelList"),
@@ -113,9 +115,46 @@ function phaseIndex(phase) {
 }
 
 function setBusy(isBusy) {
+  els.suggestGoalsBtn.disabled = isBusy;
   els.generatePlanBtn.disabled = isBusy;
   els.runPlanBtn.disabled = isBusy || !pendingPlan;
   els.clearPlanBtn.disabled = isBusy || !pendingPlan;
+}
+
+function renderSuggestedGoals(goalState) {
+  if (!goalState || goalState.error) {
+    els.suggestedGoals.innerHTML = "";
+    return;
+  }
+  const goals = goalState.goals || [];
+  if (!goals.length) {
+    els.suggestedGoals.innerHTML = "";
+    return;
+  }
+  if (!els.goalInput.value.trim()) {
+    els.goalInput.value = goals[0].goal;
+  }
+  els.suggestedGoals.innerHTML = `
+    <div class="suggestion-head">
+      <strong>Suggested Goals</strong>
+      <span class="muted">Top option prefilled</span>
+    </div>
+    ${goals.map((goal) => `
+      <button class="goal-suggestion" type="button" data-goal="${escapeHtml(goal.goal)}">
+        <span>${escapeHtml(goal.priority || "")}</span>
+        <div>
+          <strong>${escapeHtml(goal.goal)}</strong>
+          <p>${escapeHtml(goal.rationale)}</p>
+        </div>
+      </button>
+    `).join("")}
+  `;
+  els.suggestedGoals.querySelectorAll(".goal-suggestion").forEach((button) => {
+    button.addEventListener("click", () => {
+      els.goalInput.value = button.dataset.goal || "";
+      els.commandMessage.textContent = "Suggested goal loaded. Generate a plan when ready.";
+    });
+  });
 }
 
 function renderPendingPlan(planState) {
@@ -198,11 +237,33 @@ async function refresh() {
   renderObjective(data.objective);
   renderRepo(data.repo, data.generated_from);
   renderPlanner(data.planner);
+  renderSuggestedGoals(data.suggested_goals);
   renderPendingPlan(data.pending_plan);
   renderCycles(data.cycles || []);
   renderEvents(data.events || []);
   if (data.pending_plan && !activePhase) {
     setActivePhase("human-review");
+  }
+}
+
+async function suggestGoals() {
+  setBusy(true);
+  els.commandMessage.textContent = "Reading memory and proposing next goals...";
+  setActivePhase("context-intake");
+  window.setTimeout(() => setActivePhase("self-read"), 350);
+  try {
+    const data = await postJson("/api/suggest-goals");
+    renderSuggestedGoals(data.suggested_goals);
+    renderRepo(data.state.repo, data.state.generated_from);
+    renderPlanner(data.state.planner);
+    renderEvents(data.state.events || []);
+    setActivePhase("plan-proposal");
+    els.commandMessage.textContent = "Goal suggestions generated. Top goal is prefilled.";
+  } catch (error) {
+    els.commandMessage.textContent = error.message;
+    setActivePhase(null);
+  } finally {
+    setBusy(false);
   }
 }
 
@@ -289,6 +350,7 @@ async function clearPendingPlan() {
 }
 
 els.refreshBtn.addEventListener("click", refresh);
+els.suggestGoalsBtn.addEventListener("click", suggestGoals);
 els.generatePlanBtn.addEventListener("click", generatePlan);
 els.runPlanBtn.addEventListener("click", runPendingPlan);
 els.clearPlanBtn.addEventListener("click", clearPendingPlan);

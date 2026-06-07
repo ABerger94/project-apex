@@ -31,6 +31,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/api/suggest-goals":
+            self._suggest_goals()
+            return
         if parsed.path == "/api/generate-plan":
             self._generate_plan()
             return
@@ -93,6 +96,24 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json({"pending_plan": payload, "state": dashboard_state(ROOT)})
         except Exception as error:
             EventMemory(ROOT / "memory" / "events.jsonl").append("plan_generation_failed", {
+                "error": str(error),
+                "planner": OllamaPlanner().diagnostic(),
+            })
+            self._send_json({"error": str(error)}, status=500)
+
+    def _suggest_goals(self) -> None:
+        try:
+            memory = EventMemory(ROOT / "memory" / "events.jsonl")
+            planner = OllamaPlanner()
+            memory.append("goal_suggestion_started", planner.diagnostic())
+            suggestions = planner.suggest_goals(ROOT)
+            suggested_path = ROOT / "memory" / "suggested_goals.json"
+            suggested_path.parent.mkdir(parents=True, exist_ok=True)
+            suggested_path.write_text(json.dumps(suggestions, indent=2) + "\n", encoding="utf-8")
+            memory.append("goals_suggested", suggestions)
+            self._send_json({"suggested_goals": suggestions, "state": dashboard_state(ROOT)})
+        except Exception as error:
+            EventMemory(ROOT / "memory" / "events.jsonl").append("goal_suggestion_failed", {
                 "error": str(error),
                 "planner": OllamaPlanner().diagnostic(),
             })

@@ -67,12 +67,14 @@
             <label for="goalInput">Cycle Goal</label>
             <textarea id="goalInput" rows="4" placeholder="Describe the single highest-leverage improvement to plan."></textarea>
             <div class="button-row">
+              <button id="suggestGoalsBtn" class="secondary" type="button">Suggest Goals</button>
               <button id="generatePlanBtn" type="button">Generate Plan</button>
               <button id="runPlanBtn" type="button" disabled>Approve / Run</button>
               <button id="clearPlanBtn" class="secondary" type="button" disabled>Clear</button>
             </div>
             <p id="commandMessage" class="muted"></p>
             <dl id="plannerDetails" class="planner-details"></dl>
+            <div id="suggestedGoals" class="suggested-goals"></div>
             <div id="pendingPlan" class="pending-plan"></div>
           </div>
         </div>

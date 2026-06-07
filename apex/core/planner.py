@@ -67,6 +67,33 @@ class OllamaPlanner:
         context = read_repo_context(root)
         memory_events = EventMemory(root / "memory" / "events.jsonl").read_recent(12)
         prompt = build_planner_prompt(context, goal, memory_events)
+        data = self._generate_json(prompt)
+        return plan_from_dict(data)
+
+    def suggest_goals(self, root: Path, limit: int = 3) -> dict:
+        context = read_repo_context(root)
+        memory_events = EventMemory(root / "memory" / "events.jsonl").read_recent(16)
+        prompt = build_goal_suggestion_prompt(context, memory_events, limit)
+        data = self._generate_json(prompt)
+        goals = data.get("goals")
+        if not isinstance(goals, list) or not goals:
+            raise ValueError("Ollama goal suggester returned no goals")
+        clean_goals = []
+        for index, item in enumerate(goals[:limit], start=1):
+            if not isinstance(item, dict):
+                raise ValueError("Each suggested goal must be an object")
+            goal = str(item.get("goal") or "").strip()
+            rationale = str(item.get("rationale") or "").strip()
+            if not goal or not rationale:
+                raise ValueError("Each suggested goal requires goal and rationale")
+            clean_goals.append({
+                "priority": int(item.get("priority") or index),
+                "goal": goal,
+                "rationale": rationale,
+            })
+        return {"goals": clean_goals}
+
+    def _generate_json(self, prompt: str) -> dict:
         model = self._resolved_model()
         payload = {
             "model": model,
@@ -88,10 +115,9 @@ class OllamaPlanner:
         if not isinstance(content, str) or not content.strip():
             raise ValueError("Ollama planner response did not include JSON text")
         try:
-            data = json.loads(content)
+            return json.loads(content)
         except json.JSONDecodeError as error:
             raise ValueError(f"Ollama planner returned invalid JSON: {error}") from error
-        return plan_from_dict(data)
 
     def _default_endpoint(self) -> str:
         return "http://localhost:11434/api/generate"
@@ -196,6 +222,49 @@ def build_planner_prompt(context: RepoContext, goal: str, memory_events: tuple =
         context.objective_directive,
         "",
         f"User goal: {goal}",
+        "",
+        f"Branch: {context.branch}",
+        "Working tree status:",
+        status,
+        "",
+        "Recent commits:",
+        commits or "- none",
+        "",
+        "Recent memory events:",
+        memory,
+        "",
+        "Tracked files:",
+        files or "- none",
+        "",
+        "Required JSON schema shape:",
+        json.dumps(schema, indent=2),
+    ])
+
+
+def build_goal_suggestion_prompt(context: RepoContext, memory_events: tuple = (), limit: int = 3) -> str:
+    files = "\n".join(f"- {path}" for path in context.tracked_files[:80])
+    commits = "\n".join(f"- {commit}" for commit in context.recent_commits[:8])
+    status = "\n".join(f"- {line}" for line in context.status) or "- clean"
+    memory = "\n".join(format_memory_event(event) for event in memory_events) or "- none"
+    schema = {
+        "goals": [
+            {
+                "priority": 1,
+                "goal": "one concrete next cycle objective",
+                "rationale": "why this is the highest-leverage next step toward L5",
+            }
+        ]
+    }
+    return "\n".join([
+        "You are the APEX V2 autonomy goal selector.",
+        "Return exactly one JSON object and no markdown.",
+        f"Propose {limit} concrete next cycle goals, ordered by priority.",
+        "Each goal must be actionable by one small code/test improvement cycle.",
+        "Favor goals that close gaps exposed by recent memory and move toward Level 5 Organizer behavior.",
+        "Do not propose vague goals, pure documentation goals, dashboard-only goals, or goals requiring unsafe commands.",
+        "",
+        "System objective:",
+        context.objective_directive,
         "",
         f"Branch: {context.branch}",
         "Working tree status:",

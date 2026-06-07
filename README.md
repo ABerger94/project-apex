@@ -45,6 +45,10 @@ plan, and retries. The default repair limit is two follow-up plans:
 $env:APEX_REPAIR_ATTEMPTS = "2"
 ```
 
+The dashboard can also ask APEX to propose its own next cycle goals. Suggested goals are
+stored in `memory/suggested_goals.json`, logged to `memory/events.jsonl`, and the highest
+priority goal pre-fills the Cycle Goal field for review.
+
 ## Run Tests
 
 ```powershell

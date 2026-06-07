@@ -32,6 +32,7 @@ def dashboard_state(root: Path, event_limit: int = 80) -> dict:
         "events": events,
         "cycles": summarize_cycles(events),
         "pending_plan": read_pending_plan(root),
+        "suggested_goals": read_suggested_goals(root),
         "generated_from": "memory/events.jsonl",
     }
 
@@ -73,4 +74,17 @@ def read_pending_plan(root: Path) -> dict | None:
         return {"error": "pending_plan.json is not valid JSON"}
     if not isinstance(data, dict):
         return {"error": "pending_plan.json must contain an object"}
+    return data
+
+
+def read_suggested_goals(root: Path) -> dict | None:
+    path = root / "memory" / "suggested_goals.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"error": "suggested_goals.json is not valid JSON"}
+    if not isinstance(data, dict):
+        return {"error": "suggested_goals.json must contain an object"}
     return data
