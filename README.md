@@ -1,6 +1,18 @@
 # Project APEX V2
 
-APEX V2 is a clean rebuild focused on trustworthy self-improvement.
+APEX V2 is a clean rebuild focused on trustworthy self-improvement toward Level 5 AGI behavior.
+
+## Mission
+
+The overall goal is for APEX to reach and act as a **Level 5 AGI Organizer**: a system capable of performing the work of entire organizations by managing complex processes, making high-level decisions, and coordinating large-scale operations.
+
+The AGI capability ladder is hardcoded in `apex/objectives.py` and must guide planning, evaluation, and future prompts:
+
+1. **Conversational AI/Chatbots**: AI systems can hold conversations with humans, understand and respond to human language, and support human-like interaction.
+2. **Human-Level Problem Solving/Reasoners**: AI systems can solve problems at a human level, evaluate reliability, and reduce hallucinations.
+3. **Agents**: AI systems can take actions on behalf of users, perform tasks, make decisions, execute plans autonomously, and verify outcomes.
+4. **Innovators**: AI systems can create new innovations, original ideas, inventions, and approaches.
+5. **Organizers**: AI systems can perform the work of entire organizations by managing complex processes, making high-level decisions, and coordinating large-scale operations.
 
 The first milestone is intentionally narrow: run one manual improvement cycle that:
 

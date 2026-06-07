@@ -30,6 +30,7 @@ class RepoContext:
     status: tuple[str, ...]
     tracked_files: tuple[str, ...]
     recent_commits: tuple[str, ...]
+    objective_directive: str = ""
 
 
 @dataclass(frozen=True)

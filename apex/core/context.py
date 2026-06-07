@@ -4,6 +4,7 @@ from pathlib import Path
 
 from apex.core.git_ops import GitOps
 from apex.core.models import RepoContext
+from apex.objectives import objective_directive
 
 
 def read_repo_context(root: Path) -> RepoContext:
@@ -14,5 +15,5 @@ def read_repo_context(root: Path) -> RepoContext:
         status=tuple(git.status_short()),
         tracked_files=tuple(git.tracked_files()),
         recent_commits=tuple(git.recent_commits(limit=8)),
+        objective_directive=objective_directive(),
     )
-
