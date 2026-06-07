@@ -1,5 +1,7 @@
 from unittest import TestCase
 
+import unittest
+
 from apex.core.level_assessment import (
     LEVELS,
     current_level,
