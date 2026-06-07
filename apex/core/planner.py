@@ -114,10 +114,7 @@ class OllamaPlanner:
         content = raw.get("response")
         if not isinstance(content, str) or not content.strip():
             raise ValueError("Ollama planner response did not include JSON text")
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError as error:
-            raise ValueError(f"Ollama planner returned invalid JSON: {error}") from error
+        return parse_planner_json(content)
 
     def _default_endpoint(self) -> str:
         return "http://localhost:11434/api/generate"
@@ -208,7 +205,9 @@ def build_planner_prompt(context: RepoContext, goal: str, memory_events: tuple =
     }
     return "\n".join([
         "You are the APEX V2 planner.",
-        "Return exactly one JSON object and no markdown.",
+        "Return exactly one strict JSON object and no markdown.",
+        "Start the response with { and end it with }.",
+        "Do not include comments, trailing commas, single-quoted strings, or unquoted keys.",
         "Your plan will be schema-validated before any file is changed.",
         "Plan one small, reversible source or test code improvement.",
         "Do not propose memory-only, log-only, dashboard-only, or proposal-only changes.",
@@ -257,7 +256,9 @@ def build_goal_suggestion_prompt(context: RepoContext, memory_events: tuple = ()
     }
     return "\n".join([
         "You are the APEX V2 autonomy goal selector.",
-        "Return exactly one JSON object and no markdown.",
+        "Return exactly one strict JSON object and no markdown.",
+        "Start the response with { and end it with }.",
+        "Do not include comments, trailing commas, single-quoted strings, or unquoted keys.",
         f"Propose {limit} concrete next cycle goals, ordered by priority.",
         "Each goal must be actionable by one small code/test improvement cycle.",
         "Favor goals that close gaps exposed by recent memory and move toward Level 5 Organizer behavior.",
@@ -286,6 +287,40 @@ def build_goal_suggestion_prompt(context: RepoContext, memory_events: tuple = ()
 
 def plan_to_json(plan: ChangePlan) -> str:
     return json.dumps(asdict(plan), indent=2)
+
+
+def parse_planner_json(content: str) -> dict:
+    text = content.strip()
+    decoder = json.JSONDecoder()
+    try:
+        data, _ = decoder.raw_decode(text)
+    except json.JSONDecodeError:
+        data = None
+    if isinstance(data, dict):
+        return data
+
+    start = text.find("{")
+    if start == -1:
+        raise ValueError("Ollama planner response did not contain a JSON object")
+    try:
+        data, _ = decoder.raw_decode(text[start:])
+    except json.JSONDecodeError as error:
+        excerpt = invalid_json_excerpt(text[start:], error.pos)
+        raise ValueError(f"Ollama planner returned invalid JSON near: {excerpt}") from error
+    if not isinstance(data, dict):
+        raise ValueError("Ollama planner JSON root must be an object")
+    return data
+
+
+def invalid_json_excerpt(text: str, pos: int, radius: int = 160) -> str:
+    start = max(0, pos - radius)
+    end = min(len(text), pos + radius)
+    excerpt = text[start:end].replace("\n", "\\n")
+    if start > 0:
+        excerpt = "..." + excerpt
+    if end < len(text):
+        excerpt += "..."
+    return excerpt
 
 
 def format_memory_event(event: Any) -> str:

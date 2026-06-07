@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from apex.core.planner import OllamaPlanner, build_goal_suggestion_prompt, build_planner_prompt
+from apex.core.planner import OllamaPlanner, build_goal_suggestion_prompt, build_planner_prompt, parse_planner_json
 from apex.core.context import read_repo_context
 from apex.core.memory import EventMemory
 from tests.helpers import init_repo
@@ -160,6 +160,35 @@ class PlannerTests(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 planner.propose(root, "Make a plan")
+
+    def test_ollama_planner_extracts_json_from_wrapped_response(self):
+        plan_json = {
+            "title": "Improve smoke test",
+            "rationale": "Adds a concrete test improvement toward reliable verification.",
+            "target": "tests/test_smoke.py",
+            "operations": [
+                {
+                    "kind": "append_file",
+                    "path": "tests/test_smoke.py",
+                    "content": "\n# additional assertion\n",
+                }
+            ],
+            "verification_command": ["python", "-m", "unittest", "discover", "-s", "tests"],
+        }
+        wrapped = "```json\n" + json.dumps(plan_json) + "\n```\nextra text"
+        transport = FakeTransport({"response": wrapped})
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            planner = OllamaPlanner(endpoint="http://localhost:11434/api/generate", transport=transport)
+
+            plan = planner.propose(root, "Improve test evidence")
+
+            self.assertEqual(plan.title, "Improve smoke test")
+
+    def test_parse_planner_json_reports_near_malformed_object(self):
+        with self.assertRaisesRegex(ValueError, "invalid JSON near"):
+            parse_planner_json('{"ok": true,\n unquoted: false}')
 
     def test_ollama_planner_does_not_send_api_key_to_local_endpoint(self):
         plan_json = {
