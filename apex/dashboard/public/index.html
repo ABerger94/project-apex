@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APEX V2 Command Center</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Trustworthy Self-Improvement</p>
+          <h1>APEX V2 Command Center</h1>
+        </div>
+        <button id="refreshBtn" type="button">Refresh</button>
+      </header>
+
+      <section class="metrics" aria-label="Project state">
+        <article>
+          <span>Target</span>
+          <strong id="targetLevel">L5</strong>
+        </article>
+        <article>
+          <span>Branch</span>
+          <strong id="branch">--</strong>
+        </article>
+        <article>
+          <span>Tracked Files</span>
+          <strong id="trackedFiles">--</strong>
+        </article>
+        <article>
+          <span>Working Tree</span>
+          <strong id="workingTree">--</strong>
+        </article>
+      </section>
+
+      <section class="panel objective-panel">
+        <div class="panel-head">
+          <h2>Objective</h2>
+          <span id="stateSource" class="muted"></span>
+        </div>
+        <p id="objectiveText"></p>
+        <div id="levelList" class="level-list"></div>
+      </section>
+
+      <section class="layout">
+        <div class="main-column">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Manual Cycles</h2>
+              <span id="cycleCount" class="muted"></span>
+            </div>
+            <div id="cycles" class="cycles"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Event Log</h2>
+              <span class="muted">memory/events.jsonl</span>
+            </div>
+            <div id="events" class="events"></div>
+          </section>
+        </div>
+
+        <aside class="side-column">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Recent Commits</h2>
+            </div>
+            <div id="commits" class="commits"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Working Tree</h2>
+            </div>
+            <pre id="status" class="status"></pre>
+          </section>
+        </aside>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
+
