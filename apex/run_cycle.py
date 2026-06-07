@@ -64,6 +64,15 @@ def run_manual_cycle(root: Path, plan: ChangePlan, commit: bool = True, memory_p
             "returncode": result.verification.returncode,
             "command": list(result.verification.command),
             "checks": result.verification.checks,
+            "stdout_tail": tail_text(result.verification.stdout),
+            "stderr_tail": tail_text(result.verification.stderr),
         },
     })
     return result
+
+
+def tail_text(value: str, max_chars: int = 2400) -> str:
+    value = value or ""
+    if len(value) <= max_chars:
+        return value
+    return value[-max_chars:]

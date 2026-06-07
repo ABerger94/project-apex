@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -11,6 +12,7 @@ from apex.dashboard.state import dashboard_state
 from apex.core.memory import EventMemory
 from apex.core.plan_loader import plan_from_dict
 from apex.core.planner import OllamaPlanner
+from apex.core.repair import build_repair_goal, should_retry_cycle
 from apex.run_cycle import run_manual_cycle
 
 
@@ -103,10 +105,47 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         try:
             data = json.loads(pending_path.read_text(encoding="utf-8"))
+            goal = str(data.get("goal") or "") if isinstance(data, dict) else ""
             plan = plan_from_dict(data.get("plan") if isinstance(data, dict) else None)
-            result = run_manual_cycle(ROOT, plan, commit=True)
-            pending_path.unlink(missing_ok=True)
-            self._send_json({"result": asdict(result), "state": dashboard_state(ROOT)})
+            memory = EventMemory(ROOT / "memory" / "events.jsonl")
+            planner = OllamaPlanner()
+            attempts = []
+            max_repairs = max_repair_attempts()
+
+            for repair_index in range(max_repairs + 1):
+                result = run_manual_cycle(ROOT, plan, commit=True)
+                attempts.append(asdict(result))
+                if result.accepted:
+                    pending_path.unlink(missing_ok=True)
+                    self._send_json({"result": asdict(result), "attempts": attempts, "state": dashboard_state(ROOT)})
+                    return
+                if repair_index >= max_repairs or not should_retry_cycle(result):
+                    pending_path.write_text(json.dumps({
+                        "goal": goal,
+                        "plan": asdict(plan),
+                        "last_failure": asdict(result),
+                        "repair_attempts_exhausted": repair_index >= max_repairs,
+                    }, indent=2) + "\n", encoding="utf-8")
+                    self._send_json({"result": asdict(result), "attempts": attempts, "state": dashboard_state(ROOT)})
+                    return
+
+                repair_goal = build_repair_goal(goal, plan, result, repair_index + 1)
+                memory.append("cycle_repair_started", {
+                    "failed_title": plan.title,
+                    "failure_reason": result.reason,
+                    "repair_attempt": repair_index + 1,
+                    "max_repairs": max_repairs,
+                })
+                plan = planner.propose(ROOT, repair_goal)
+                pending_path.write_text(json.dumps({"goal": goal, "plan": asdict(plan)}, indent=2) + "\n", encoding="utf-8")
+                memory.append("cycle_repair_plan_generated", {
+                    "title": plan.title,
+                    "target": plan.target,
+                    "operation_count": len(plan.operations),
+                    "operations": [asdict(operation) for operation in plan.operations],
+                    "verification_command": list(plan.verification_command),
+                    "plan": asdict(plan),
+                })
         except Exception as error:
             EventMemory(ROOT / "memory" / "events.jsonl").append("pending_plan_run_failed", {"error": str(error)})
             self._send_json({"error": str(error)}, status=500)
@@ -141,6 +180,16 @@ def run(port: int = DEFAULT_PORT) -> None:
     server = ThreadingHTTPServer(("127.0.0.1", port), DashboardHandler)
     print(f"APEX V2 command center running at http://127.0.0.1:{port}")
     server.serve_forever()
+
+
+def max_repair_attempts() -> int:
+    configured = os.getenv("APEX_REPAIR_ATTEMPTS")
+    if configured:
+        try:
+            return max(0, int(configured))
+        except ValueError:
+            return 2
+    return 2
 
 
 if __name__ == "__main__":

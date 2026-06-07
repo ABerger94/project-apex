@@ -37,6 +37,14 @@ A valid self-improvement cycle must:
 - produce a non-empty git diff before commit;
 - record a structured cycle result.
 
+When a dashboard-approved cycle fails for a retryable reason such as `verification_failed`,
+APEX rolls back the failed patch, logs the evidence, asks the planner for a different repair
+plan, and retries. The default repair limit is two follow-up plans:
+
+```powershell
+$env:APEX_REPAIR_ATTEMPTS = "2"
+```
+
 ## Run Tests
 
 ```powershell

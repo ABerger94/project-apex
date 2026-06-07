@@ -262,9 +262,10 @@ async function runPendingPlan() {
     renderCycles(data.state.cycles || []);
     renderEvents(data.state.events || []);
     setActivePhase("commit-or-rollback");
+    const attemptCount = data.attempts?.length || 1;
     els.commandMessage.textContent = data.result.accepted
-      ? `Accepted and committed ${data.result.commit_hash || ""}`.trim()
-      : `Rejected and rolled back: ${data.result.evaluation.reason}`;
+      ? `Accepted after ${attemptCount} attempt(s) and committed ${data.result.commit_hash || ""}`.trim()
+      : `Rejected after ${attemptCount} attempt(s): ${data.result.evaluation.reason}`;
   } catch (error) {
     els.commandMessage.textContent = error.message;
   } finally {
