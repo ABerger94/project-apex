@@ -24,6 +24,10 @@ class GitOps:
     def status_short(self) -> list[str]:
         return [line for line in self.run(["status", "--short"]).stdout.splitlines() if line]
 
+    def is_repository(self) -> bool:
+        result = self.run(["rev-parse", "--is-inside-work-tree"])
+        return result.returncode == 0 and result.stdout.strip() == "true"
+
     def tracked_files(self) -> list[str]:
         return [line for line in self.run(["ls-files"]).stdout.splitlines() if line]
 
@@ -41,6 +45,25 @@ class GitOps:
                 if relative not in tracked and path.exists():
                     paths.append(relative)
         return list(dict.fromkeys(paths))
+
+    def diff_stat(self, paths: list[Path] | None = None) -> list[str]:
+        args = ["diff", "--stat"]
+        if paths:
+            args.extend(["--", *[str(path.relative_to(self.root)) for path in paths]])
+        result = self.run(args)
+        return [line.rstrip() for line in result.stdout.splitlines() if line.strip()]
+
+    def dirty_paths(self) -> set[str]:
+        paths: set[str] = set()
+        for line in self.status_short():
+            value = line[3:] if len(line) > 3 else ""
+            if " -> " in value:
+                old, new = value.split(" -> ", 1)
+                paths.add(old.strip())
+                paths.add(new.strip())
+            elif value:
+                paths.add(value.strip())
+        return paths
 
     def add(self, paths: list[Path]) -> None:
         if not paths:

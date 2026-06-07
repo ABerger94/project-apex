@@ -5,8 +5,10 @@ from dataclasses import asdict
 from pathlib import Path
 
 from apex.core.context import read_repo_context
+from apex.core.diff_preview import build_plan_preview
 from apex.core.git_ops import GitOps
 from apex.core.memory import EventMemory
+from apex.core.plan_loader import plan_from_dict
 from apex.core.planner import OllamaPlanner
 from apex.objectives import AGI_LEVELS, TARGET_AGI_LEVEL, TARGET_OBJECTIVE
 
@@ -56,6 +58,8 @@ def summarize_cycles(events: list[dict]) -> list[dict]:
                 "reason": data.get("reason"),
                 "commit_hash": data.get("commit_hash"),
                 "changed_paths": list(data.get("changed_paths") or []),
+                "preflight": data.get("preflight"),
+                "diff_summary": list(data.get("diff_summary") or []),
             })
     return list(reversed(cycles))
 
@@ -74,6 +78,11 @@ def read_pending_plan(root: Path) -> dict | None:
         return {"error": "pending_plan.json is not valid JSON"}
     if not isinstance(data, dict):
         return {"error": "pending_plan.json must contain an object"}
+    if isinstance(data.get("plan"), dict):
+        try:
+            data["preview"] = build_plan_preview(root, plan_from_dict(data["plan"]))
+        except Exception as error:
+            data["preview"] = {"files": [], "errors": [{"error": str(error)}]}
     return data
 
 

@@ -29,6 +29,9 @@ class Patcher:
             changed.append(path)
         return PatchResult(changed_paths=tuple(dict.fromkeys(changed)))
 
+    def planned_paths(self, plan: ChangePlan) -> tuple[Path, ...]:
+        return tuple(dict.fromkeys(self._resolve(operation.path) for operation in plan.operations))
+
     def _resolve(self, relative_path: str) -> Path:
         clean = relative_path.replace("\\", "/")
         if clean.startswith("/") or ".." in clean.split("/"):

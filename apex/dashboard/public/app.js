@@ -13,6 +13,7 @@ const els = {
   refreshBtn: document.querySelector("#refreshBtn"),
   suggestGoalsBtn: document.querySelector("#suggestGoalsBtn"),
   generatePlanBtn: document.querySelector("#generatePlanBtn"),
+  dryRunPlanBtn: document.querySelector("#dryRunPlanBtn"),
   runPlanBtn: document.querySelector("#runPlanBtn"),
   clearPlanBtn: document.querySelector("#clearPlanBtn"),
   goalInput: document.querySelector("#goalInput"),
@@ -117,6 +118,7 @@ function phaseIndex(phase) {
 function setBusy(isBusy) {
   els.suggestGoalsBtn.disabled = isBusy;
   els.generatePlanBtn.disabled = isBusy;
+  els.dryRunPlanBtn.disabled = isBusy || !pendingPlan;
   els.runPlanBtn.disabled = isBusy || !pendingPlan;
   els.clearPlanBtn.disabled = isBusy || !pendingPlan;
 }
@@ -159,6 +161,7 @@ function renderSuggestedGoals(goalState) {
 
 function renderPendingPlan(planState) {
   pendingPlan = planState;
+  els.dryRunPlanBtn.disabled = !pendingPlan;
   els.runPlanBtn.disabled = !pendingPlan;
   els.clearPlanBtn.disabled = !pendingPlan;
   if (!pendingPlan) {
@@ -171,6 +174,9 @@ function renderPendingPlan(planState) {
   }
   const plan = pendingPlan.plan || {};
   const operations = plan.operations || [];
+  const preview = pendingPlan.preview || {};
+  const previewFiles = preview.files || [];
+  const previewErrors = preview.errors || [];
   els.pendingPlan.innerHTML = `
     <article>
       <div class="pending-head">
@@ -183,6 +189,16 @@ function renderPendingPlan(planState) {
       <p>${escapeHtml(plan.rationale || "")}</p>
       <div class="changed-files">
         ${operations.length ? operations.map((operation) => `<span>${escapeHtml(operation.kind)}: ${escapeHtml(operation.path)}</span>`).join("") : `<span>No operations</span>`}
+      </div>
+      <div class="diff-preview">
+        <strong>Diff Preview</strong>
+        ${previewFiles.length ? previewFiles.map((file) => `
+          <section>
+            <span>${escapeHtml(file.path)}</span>
+            <pre>${escapeHtml(file.diff || "No textual diff.")}</pre>
+          </section>
+        `).join("") : `<p class="empty">No preview available.</p>`}
+        ${previewErrors.length ? previewErrors.map((item) => `<p class="error">${escapeHtml(item.path || "preview")}: ${escapeHtml(item.error)}</p>`).join("") : ""}
       </div>
       <pre>${escapeHtml(JSON.stringify(plan, null, 2))}</pre>
     </article>
@@ -197,6 +213,8 @@ function renderCycles(cycles) {
   }
   els.cycles.innerHTML = cycles.map((cycle) => {
     const changed = cycle.changed_paths || [];
+    const diffSummary = cycle.diff_summary || [];
+    const preflight = cycle.preflight || {};
     return `
       <article class="cycle ${cycle.accepted ? "accepted" : "rejected"}">
         <div class="cycle-top">
@@ -207,6 +225,8 @@ function renderCycles(cycles) {
           <span class="badge">${cycle.accepted ? "Accepted" : "Rejected"}</span>
         </div>
         <p>${cycle.commit_hash ? `Commit <span class="hash">${escapeHtml(cycle.commit_hash)}</span>` : "No commit"}</p>
+        <p class="muted">Preflight: ${escapeHtml(preflight.reason || "not recorded")}</p>
+        ${diffSummary.length ? `<pre>${escapeHtml(diffSummary.join("\n"))}</pre>` : ""}
         <div class="changed-files">
           ${changed.length ? changed.map((path) => `<span>${escapeHtml(path)}</span>`).join("") : `<span>No changed paths recorded</span>`}
         </div>
@@ -334,6 +354,30 @@ async function runPendingPlan() {
   }
 }
 
+async function dryRunPendingPlan() {
+  if (!pendingPlan) return;
+  setBusy(true);
+  els.commandMessage.textContent = "Running approved plan in a temporary copy...";
+  setActivePhase("execute");
+  window.setTimeout(() => setActivePhase("test"), 500);
+  try {
+    const data = await postJson("/api/dry-run-pending-plan");
+    renderPendingPlan(data.state.pending_plan);
+    renderRepo(data.state.repo, data.state.generated_from);
+    renderPlanner(data.state.planner);
+    renderCycles(data.state.cycles || []);
+    renderEvents(data.state.events || []);
+    setActivePhase("human-review");
+    els.commandMessage.textContent = data.result.accepted
+      ? "Dry run accepted without mutating the repository."
+      : `Dry run rejected: ${data.result.reason}`;
+  } catch (error) {
+    els.commandMessage.textContent = error.message;
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function clearPendingPlan() {
   setBusy(true);
   try {
@@ -352,6 +396,7 @@ async function clearPendingPlan() {
 els.refreshBtn.addEventListener("click", refresh);
 els.suggestGoalsBtn.addEventListener("click", suggestGoals);
 els.generatePlanBtn.addEventListener("click", generatePlan);
+els.dryRunPlanBtn.addEventListener("click", dryRunPendingPlan);
 els.runPlanBtn.addEventListener("click", runPendingPlan);
 els.clearPlanBtn.addEventListener("click", clearPendingPlan);
 setActivePhase(null);

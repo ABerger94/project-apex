@@ -33,9 +33,10 @@ A valid self-improvement cycle must:
 
 - change at least one functional source or test file;
 - avoid proposal-only, memory-only, or log-only changes;
+- pass preflight checks for repository state, safe paths, dirty planned files, and verification command availability;
 - pass the configured test command;
 - produce a non-empty git diff before commit;
-- record a structured cycle result.
+- record a structured cycle result with preflight, verification, evaluation, and diff-summary evidence.
 
 When a dashboard-approved cycle fails for a retryable reason such as `verification_failed`,
 APEX rolls back the failed patch, logs the evidence, asks the planner for a different repair
@@ -49,10 +50,35 @@ The dashboard can also ask APEX to propose its own next cycle goals. Suggested g
 stored in `memory/suggested_goals.json`, logged to `memory/events.jsonl`, and the highest
 priority goal pre-fills the Cycle Goal field for review.
 
+Pending dashboard plans include a diff preview before approval. Use **Dry Run** to apply
+and verify a pending plan in a temporary repository copy without mutating the real checkout.
+
 ## Run Tests
 
 ```powershell
 python -m unittest discover -s tests
+```
+
+If `python` is not on PATH on Windows, use the Python launcher or the installed interpreter:
+
+```powershell
+py -m unittest discover -s tests
+C:\Users\alekn\AppData\Local\Programs\Python\Python312\python.exe -m unittest discover -s tests
+```
+
+Cycle plans carry their own `verification_command`. If `python` is unavailable or unreliable
+in your shell, set that field to the explicit interpreter path before approving the plan.
+
+## Run One Plan
+
+```powershell
+python -m apex.cli examples\plans\replace_module_value.json --root .
+```
+
+Validate a plan in a temporary copy without changing the repository:
+
+```powershell
+python -m apex.cli examples\plans\replace_module_value.json --root . --dry-run
 ```
 
 ## Ollama Planner Setup

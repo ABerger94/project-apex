@@ -10,66 +10,29 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List
 
+from apex.objectives import AGI_LEVELS
+
 
 @dataclass(frozen=True)
 class LevelCriterion:
     name: str
     description: str
+    required_capabilities: tuple[str, ...]
 
 
 LEVELS: Dict[int, LevelCriterion] = {
-    1: LevelCriterion(
-        name="Conversational AI",
-        description="Hold conversations, understand and respond to language.",
-    ),
-    2: LevelCriterion(
-        name="Human-Level Reasoning",
-        description="Solve problems at human level with reliable evaluation.",
-    ),
-    3: LevelCriterion(
-        name="Agent",
-        description=(
-            "Take actions, perform tasks, execute plans autonomously, "
-            "and verify outcomes."
-        ),
-    ),
-    4: LevelCriterion(
-        name="Innovator",
-        description=(
-            "Generate original ideas, inventions, and approaches that "
-            "push beyond routine problem solving."
-        ),
-    ),
-    5: LevelCriterion(
-        name="Organizer",
-        description=(
-            "Manage complex processes, make high-level decisions, and "
-            "coordinate large-scale operations with evidence and "
-            "accountability."
-        ),
-    ),
+    level.level: LevelCriterion(
+        name=level.name,
+        description=level.description,
+        required_capabilities=level.required_capabilities,
+    )
+    for level in AGI_LEVELS
 }
 
 
 _REQUIRED_FEATURES: Dict[int, List[str]] = {
-    1: ["conversational"],
-    2: ["conversational", "reasoning"],
-    3: ["conversational", "reasoning", "action", "verification"],
-    4: [
-        "conversational",
-        "reasoning",
-        "action",
-        "verification",
-        "reflection",
-    ],
-    5: [
-        "conversational",
-        "reasoning",
-        "action",
-        "verification",
-        "reflection",
-        "coordination",
-    ],
+    level: list(criterion.required_capabilities)
+    for level, criterion in LEVELS.items()
 }
 
 

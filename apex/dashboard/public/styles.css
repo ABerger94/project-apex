@@ -384,6 +384,28 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.diff-preview {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.diff-preview section {
+  display: grid;
+  gap: 6px;
+}
+
+.diff-preview span {
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+.diff-preview pre {
+  max-height: 220px;
+  margin: 0;
+}
+
 .error {
   color: var(--bad);
 }
@@ -506,12 +528,17 @@ textarea {
 }
 
 pre.status,
-.event pre {
+.event pre,
+.cycle pre {
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.cycle pre {
+  margin-top: 8px;
 }
 
 pre.status {

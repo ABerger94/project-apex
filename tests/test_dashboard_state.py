@@ -68,7 +68,16 @@ class DashboardStateTests(unittest.TestCase):
                 "goal": "Improve verification",
                 "plan": {
                     "title": "Tighten verifier",
-                    "operations": [],
+                    "rationale": "Make a concrete code change.",
+                    "target": "module.py",
+                    "operations": [
+                        {
+                            "kind": "replace_text",
+                            "path": "module.py",
+                            "old": "VALUE = 1",
+                            "new": "VALUE = 2",
+                        }
+                    ],
                 },
             }), encoding="utf-8")
 
@@ -76,6 +85,8 @@ class DashboardStateTests(unittest.TestCase):
 
             self.assertEqual(state["pending_plan"]["goal"], "Improve verification")
             self.assertEqual(state["pending_plan"]["plan"]["title"], "Tighten verifier")
+            self.assertIn("-VALUE = 1", state["pending_plan"]["preview"]["files"][0]["diff"])
+            self.assertIn("+VALUE = 2", state["pending_plan"]["preview"]["files"][0]["diff"])
 
     def test_dashboard_state_includes_suggested_goals(self):
         with tempfile.TemporaryDirectory() as temp_dir:

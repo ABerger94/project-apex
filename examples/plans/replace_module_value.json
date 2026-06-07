@@ -1,13 +1,13 @@
 {
-  "title": "Raise demo module value",
+  "title": "Clarify package docstring",
   "rationale": "Demonstrates a concrete functional source edit through the guarded manual cycle.",
-  "target": "module.py",
+  "target": "apex/__init__.py",
   "operations": [
     {
       "kind": "replace_text",
-      "path": "module.py",
-      "old": "VALUE = 1",
-      "new": "VALUE = 2"
+      "path": "apex/__init__.py",
+      "old": "\"\"\"APEX V2 core package.\"\"\"",
+      "new": "\"\"\"APEX V2 guarded self-improvement package.\"\"\""
     }
   ],
   "verification_command": ["python", "-m", "unittest", "discover", "-s", "tests"]

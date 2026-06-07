@@ -56,6 +56,13 @@ class EvaluationResult:
 
 
 @dataclass(frozen=True)
+class PreflightResult:
+    passed: bool
+    reason: str
+    evidence: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class CycleResult:
     accepted: bool
     reason: str
@@ -64,6 +71,8 @@ class CycleResult:
     commit_hash: str | None
     verification: VerificationResult
     evaluation: EvaluationResult
+    preflight: PreflightResult = field(default_factory=lambda: PreflightResult(True, "passed"))
+    diff_summary: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

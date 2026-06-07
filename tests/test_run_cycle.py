@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from apex.core.models import ChangePlan, FileOperation
-from apex.run_cycle import run_manual_cycle
+from apex.run_cycle import run_dry_cycle, run_manual_cycle
 from tests.helpers import init_repo, python_test_command, run_git
 
 
@@ -81,6 +81,44 @@ class RunCycleTests(unittest.TestCase):
             self.assertEqual(result.reason, "accepted")
             self.assertTrue((root / "insights.py").exists())
             self.assertIn("insights.py", run_git(root, ["ls-files"]).stdout)
+
+    def test_cycle_rejects_dirty_planned_path_without_patching(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            (root / "module.py").write_text("VALUE = 9\n", encoding="utf-8")
+            plan = ChangePlan(
+                title="Raise module value",
+                rationale="Dirty files must be preserved.",
+                target="module.py",
+                operations=(FileOperation(kind="replace_text", path="module.py", old="VALUE = 9", new="VALUE = 2"),),
+                verification_command=python_test_command(),
+            )
+
+            result = run_manual_cycle(root, plan)
+
+            self.assertFalse(result.accepted)
+            self.assertEqual(result.reason, "dirty_plan_paths")
+            self.assertEqual((root / "module.py").read_text(encoding="utf-8"), "VALUE = 9\n")
+
+    def test_dry_cycle_does_not_mutate_original_repo(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            plan = ChangePlan(
+                title="Raise module value",
+                rationale="Dry runs should validate in a temporary copy.",
+                target="module.py",
+                operations=(FileOperation(kind="replace_text", path="module.py", old="VALUE = 1", new="VALUE = 2"),),
+                verification_command=python_test_command(),
+            )
+
+            result = run_dry_cycle(root, plan)
+
+            self.assertTrue(result.accepted)
+            self.assertIsNone(result.commit_hash)
+            self.assertEqual((root / "module.py").read_text(encoding="utf-8"), "VALUE = 1\n")
+            self.assertNotIn("Raise module value", run_git(root, ["log", "-1", "--pretty=%s"]).stdout)
 
 
 if __name__ == "__main__":

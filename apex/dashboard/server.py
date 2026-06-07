@@ -13,7 +13,7 @@ from apex.core.memory import EventMemory
 from apex.core.plan_loader import plan_from_dict
 from apex.core.planner import OllamaPlanner
 from apex.core.repair import build_repair_goal, should_retry_cycle
-from apex.run_cycle import run_manual_cycle
+from apex.run_cycle import run_dry_cycle, run_manual_cycle
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,6 +39,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/run-pending-plan":
             self._run_pending_plan()
+            return
+        if parsed.path == "/api/dry-run-pending-plan":
+            self._dry_run_pending_plan()
             return
         if parsed.path == "/api/clear-pending-plan":
             self._clear_pending_plan()
@@ -169,6 +172,28 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 })
         except Exception as error:
             EventMemory(ROOT / "memory" / "events.jsonl").append("pending_plan_run_failed", {"error": str(error)})
+            self._send_json({"error": str(error)}, status=500)
+
+    def _dry_run_pending_plan(self) -> None:
+        pending_path = ROOT / "memory" / "pending_plan.json"
+        if not pending_path.exists():
+            self._send_json({"error": "no pending plan to dry-run"}, status=400)
+            return
+        try:
+            data = json.loads(pending_path.read_text(encoding="utf-8"))
+            plan = plan_from_dict(data.get("plan") if isinstance(data, dict) else None)
+            result = run_dry_cycle(ROOT, plan)
+            EventMemory(ROOT / "memory" / "events.jsonl").append("pending_plan_dry_run_finished", {
+                "title": result.title,
+                "accepted": result.accepted,
+                "reason": result.reason,
+                "changed_paths": list(result.changed_paths),
+                "preflight": asdict(result.preflight),
+                "diff_summary": list(result.diff_summary),
+            })
+            self._send_json({"result": asdict(result), "state": dashboard_state(ROOT)})
+        except Exception as error:
+            EventMemory(ROOT / "memory" / "events.jsonl").append("pending_plan_dry_run_failed", {"error": str(error)})
             self._send_json({"error": str(error)}, status=500)
 
     def _clear_pending_plan(self) -> None:
