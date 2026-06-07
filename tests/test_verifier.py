@@ -15,14 +15,20 @@ class VerifierTests(unittest.TestCase):
             os.environ["APEX_ORACLE_PROVIDER"] = "ollama"
             os.environ["APEX_REMOTE_ORACLE_MODE"] = "always"
             with tempfile.TemporaryDirectory() as temp_dir:
-                result = Verifier(Path(temp_dir)).run((
-                    sys.executable,
-                    "-c",
-                    "import os; print(os.getenv('APEX_ORACLE_PROVIDER'), os.getenv('APEX_REMOTE_ORACLE_MODE'))",
-                ))
+                root = Path(temp_dir)
+                (root / "tests").mkdir()
+                (root / "tests" / "test_env.py").write_text(
+                    "import os\nimport unittest\n\n\n"
+                    "class EnvTests(unittest.TestCase):\n"
+                    "    def test_oracle_env_is_isolated(self):\n"
+                    "        self.assertEqual(os.getenv('APEX_ORACLE_PROVIDER'), 'local')\n"
+                    "        self.assertEqual(os.getenv('APEX_REMOTE_ORACLE_MODE'), 'outer')\n",
+                    encoding="utf-8",
+                )
+                result = Verifier(root).run((sys.executable, "-m", "unittest", "discover", "-s", "tests"))
 
             self.assertTrue(result.passed)
-            self.assertIn("local outer", result.stdout)
+            self.assertIn("OK", result.stdout + result.stderr)
         finally:
             if previous_provider is None:
                 os.environ.pop("APEX_ORACLE_PROVIDER", None)
@@ -33,7 +39,21 @@ class VerifierTests(unittest.TestCase):
             else:
                 os.environ["APEX_REMOTE_ORACLE_MODE"] = previous_mode
 
+    def test_verifier_fails_fast_on_changed_python_syntax_error(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            bad_file = root / "bad.py"
+            bad_file.write_text("def broken(:\n", encoding="utf-8")
+
+            result = Verifier(root).run(
+                (sys.executable, "-m", "unittest", "discover", "-s", "tests"),
+                changed_paths=(bad_file,),
+            )
+
+            self.assertFalse(result.passed)
+            self.assertEqual(result.checks[0]["name"], "syntax:bad.py")
+            self.assertFalse(result.checks[0]["passed"])
+
 
 if __name__ == "__main__":
     unittest.main()
-

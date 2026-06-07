@@ -5,17 +5,24 @@ from pathlib import Path
 from apex.core.context import read_repo_context
 from apex.core.evaluator import Evaluator
 from apex.core.git_ops import GitOps
+from apex.core.memory import EventMemory
 from apex.core.models import ChangePlan, CycleResult
 from apex.core.patcher import Patcher
 from apex.core.verifier import Verifier
 
 
-def run_manual_cycle(root: Path, plan: ChangePlan, commit: bool = True) -> CycleResult:
+def run_manual_cycle(root: Path, plan: ChangePlan, commit: bool = True, memory_path: Path | None = None) -> CycleResult:
     root = root.resolve()
-    read_repo_context(root)
+    memory = EventMemory(memory_path or root / "memory" / "events.jsonl")
+    context = read_repo_context(root)
+    memory.append("cycle_started", {
+        "title": plan.title,
+        "branch": context.branch,
+        "status_count": len(context.status),
+    })
     git = GitOps(root)
     patch_result = Patcher(root).apply(plan)
-    verification = Verifier(root).run(plan.verification_command)
+    verification = Verifier(root).run(plan.verification_command, patch_result.changed_paths)
     diff_paths = tuple(git.diff_name_only())
     evaluation = Evaluator().evaluate(plan, patch_result.changed_paths, verification, diff_paths, root)
 
@@ -26,7 +33,7 @@ def run_manual_cycle(root: Path, plan: ChangePlan, commit: bool = True) -> Cycle
     elif not evaluation.accepted:
         git.rollback_paths(list(patch_result.changed_paths))
 
-    return CycleResult(
+    result = CycleResult(
         accepted=evaluation.accepted,
         reason=evaluation.reason,
         title=plan.title,
@@ -35,4 +42,11 @@ def run_manual_cycle(root: Path, plan: ChangePlan, commit: bool = True) -> Cycle
         verification=verification,
         evaluation=evaluation,
     )
-
+    memory.append("cycle_finished", {
+        "title": result.title,
+        "accepted": result.accepted,
+        "reason": result.reason,
+        "commit_hash": result.commit_hash,
+        "changed_paths": list(result.changed_paths),
+    })
+    return result

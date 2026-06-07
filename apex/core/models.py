@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from datetime import datetime, timezone
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class VerificationResult:
     stdout: str
     stderr: str
     passed: bool
+    checks: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -62,3 +64,23 @@ class CycleResult:
     verification: VerificationResult
     evaluation: EvaluationResult
 
+
+@dataclass(frozen=True)
+class ExecutionResult:
+    command: tuple[str, ...]
+    returncode: int
+    stdout: str
+    stderr: str
+    duration_seconds: float
+    timed_out: bool = False
+
+    @property
+    def passed(self) -> bool:
+        return self.returncode == 0 and not self.timed_out
+
+
+@dataclass(frozen=True)
+class MemoryEvent:
+    event_type: str
+    data: dict
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
