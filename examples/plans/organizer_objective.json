@@ -1,0 +1,30 @@
+{
+  "title": "Add multi-cycle objective decomposer",
+  "description": "Decompose a high-level L5 objective into ordered, dependency-tagged single-cycle goals consumable by the plan_loader/run_cycle pipeline.",
+  "objectives": [
+    {
+      "id": "design-organizer-api",
+      "title": "Design the organizer decomposer API",
+      "description": "Define the function signature and output shape for apex.core.organizer.decompose_objective.",
+      "depends_on": []
+    },
+    {
+      "id": "implement-decomposer",
+      "title": "Implement the decomposer",
+      "description": "Implement deterministic topological ordering of single-cycle goals.",
+      "depends_on": ["design-organizer-api"]
+    },
+    {
+      "id": "add-example-objective",
+      "title": "Add an example organizer objective",
+      "description": "Provide examples/plans/organizer_objective.json for manual and automated runs.",
+      "depends_on": ["design-organizer-api"]
+    },
+    {
+      "id": "test-decomposer",
+      "title": "Test determinism and dependency ordering",
+      "description": "Add tests/test_organizer.py asserting deterministic output and topological ordering.",
+      "depends_on": ["implement-decomposer", "add-example-objective"]
+    }
+  ]
+}
