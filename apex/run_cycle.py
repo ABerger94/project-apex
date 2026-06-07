@@ -19,11 +19,21 @@ def run_manual_cycle(root: Path, plan: ChangePlan, commit: bool = True, memory_p
         "title": plan.title,
         "branch": context.branch,
         "status_count": len(context.status),
+        "target": plan.target,
+        "operation_count": len(plan.operations),
+        "operations": [
+            {
+                "kind": operation.kind,
+                "path": operation.path,
+            }
+            for operation in plan.operations
+        ],
+        "verification_command": list(plan.verification_command),
     })
     git = GitOps(root)
     patch_result = Patcher(root).apply(plan)
     verification = Verifier(root).run(plan.verification_command, patch_result.changed_paths)
-    diff_paths = tuple(git.diff_name_only())
+    diff_paths = tuple(git.diff_name_only(list(patch_result.changed_paths)))
     evaluation = Evaluator().evaluate(plan, patch_result.changed_paths, verification, diff_paths, root)
 
     commit_hash = None
@@ -48,5 +58,12 @@ def run_manual_cycle(root: Path, plan: ChangePlan, commit: bool = True, memory_p
         "reason": result.reason,
         "commit_hash": result.commit_hash,
         "changed_paths": list(result.changed_paths),
+        "evaluation_evidence": result.evaluation.evidence,
+        "verification": {
+            "passed": result.verification.passed,
+            "returncode": result.verification.returncode,
+            "command": list(result.verification.command),
+            "checks": result.verification.checks,
+        },
     })
     return result

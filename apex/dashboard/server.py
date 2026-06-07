@@ -84,6 +84,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "title": plan.title,
                 "target": plan.target,
                 "operation_count": len(plan.operations),
+                "operations": [asdict(operation) for operation in plan.operations],
+                "verification_command": list(plan.verification_command),
+                "plan": asdict(plan),
             })
             self._send_json({"pending_plan": payload, "state": dashboard_state(ROOT)})
         except Exception as error:

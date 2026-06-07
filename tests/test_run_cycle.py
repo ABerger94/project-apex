@@ -46,7 +46,42 @@ class RunCycleTests(unittest.TestCase):
             self.assertEqual(result.reason, "proposal_or_log_only_change")
             self.assertFalse((root / "self_edit" / "proposals" / "idea.md").exists())
 
+    def test_cycle_commits_new_functional_files_when_tests_pass(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            plan = ChangePlan(
+                title="Add insights helper",
+                rationale="New tested source files must count as concrete improvement.",
+                target="insights.py",
+                operations=(
+                    FileOperation(
+                        kind="write_file",
+                        path="insights.py",
+                        content="def current_level():\n    return 3\n",
+                    ),
+                    FileOperation(
+                        kind="write_file",
+                        path="tests/test_insights.py",
+                        content=(
+                            "import unittest\n\n"
+                            "from insights import current_level\n\n\n"
+                            "class InsightTests(unittest.TestCase):\n"
+                            "    def test_current_level(self):\n"
+                            "        self.assertEqual(current_level(), 3)\n"
+                        ),
+                    ),
+                ),
+                verification_command=python_test_command(),
+            )
+
+            result = run_manual_cycle(root, plan)
+
+            self.assertTrue(result.accepted)
+            self.assertEqual(result.reason, "accepted")
+            self.assertTrue((root / "insights.py").exists())
+            self.assertIn("insights.py", run_git(root, ["ls-files"]).stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
-

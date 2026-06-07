@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from apex.core.context import read_repo_context
+from apex.core.memory import EventMemory
 from apex.core.models import ChangePlan, RepoContext
 from apex.core.plan_loader import plan_from_dict
 
@@ -64,7 +65,8 @@ class OllamaPlanner:
 
     def propose(self, root: Path, goal: str) -> ChangePlan:
         context = read_repo_context(root)
-        prompt = build_planner_prompt(context, goal)
+        memory_events = EventMemory(root / "memory" / "events.jsonl").read_recent(12)
+        prompt = build_planner_prompt(context, goal, memory_events)
         model = self._resolved_model()
         payload = {
             "model": model,
@@ -146,10 +148,11 @@ class OllamaPlanner:
         return data
 
 
-def build_planner_prompt(context: RepoContext, goal: str) -> str:
+def build_planner_prompt(context: RepoContext, goal: str, memory_events: tuple = ()) -> str:
     files = "\n".join(f"- {path}" for path in context.tracked_files[:80])
     commits = "\n".join(f"- {commit}" for commit in context.recent_commits[:5])
     status = "\n".join(f"- {line}" for line in context.status) or "- clean"
+    memory = "\n".join(format_memory_event(event) for event in memory_events) or "- none"
     schema = {
         "title": "short concrete title",
         "rationale": "why this advances the Level 5 objective",
@@ -201,6 +204,9 @@ def build_planner_prompt(context: RepoContext, goal: str) -> str:
         "Recent commits:",
         commits or "- none",
         "",
+        "Recent memory events:",
+        memory,
+        "",
         "Tracked files:",
         files or "- none",
         "",
@@ -211,3 +217,26 @@ def build_planner_prompt(context: RepoContext, goal: str) -> str:
 
 def plan_to_json(plan: ChangePlan) -> str:
     return json.dumps(asdict(plan), indent=2)
+
+
+def format_memory_event(event: Any) -> str:
+    data = getattr(event, "data", {}) or {}
+    event_type = getattr(event, "event_type", "unknown")
+    timestamp = getattr(event, "timestamp", "")
+    title = data.get("title") or data.get("goal") or ""
+    reason = data.get("reason") or data.get("error") or ""
+    accepted = data.get("accepted")
+    target = data.get("target") or ""
+    operation_count = data.get("operation_count")
+    pieces = [str(event_type)]
+    if title:
+        pieces.append(f"title={title}")
+    if target:
+        pieces.append(f"target={target}")
+    if operation_count is not None:
+        pieces.append(f"operations={operation_count}")
+    if accepted is not None:
+        pieces.append(f"accepted={accepted}")
+    if reason:
+        pieces.append(f"reason={reason}")
+    return f"- {timestamp} " + "; ".join(pieces)

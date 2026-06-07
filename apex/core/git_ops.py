@@ -31,9 +31,16 @@ class GitOps:
         result = self.run(["log", f"-{limit}", "--oneline"])
         return [line for line in result.stdout.splitlines() if line]
 
-    def diff_name_only(self) -> list[str]:
+    def diff_name_only(self, extra_paths: list[Path] | None = None) -> list[str]:
         result = self.run(["diff", "--name-only"])
-        return [line for line in result.stdout.splitlines() if line]
+        paths = [line for line in result.stdout.splitlines() if line]
+        if extra_paths:
+            tracked = set(self.tracked_files())
+            for path in extra_paths:
+                relative = str(path.relative_to(self.root)).replace("\\", "/")
+                if relative not in tracked and path.exists():
+                    paths.append(relative)
+        return list(dict.fromkeys(paths))
 
     def add(self, paths: list[Path]) -> None:
         if not paths:
@@ -66,4 +73,3 @@ class GitOps:
         for path in untracked_paths:
             if path.exists() and path.is_file():
                 path.unlink()
-

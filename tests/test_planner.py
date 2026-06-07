@@ -5,6 +5,7 @@ from pathlib import Path
 
 from apex.core.planner import OllamaPlanner, build_planner_prompt
 from apex.core.context import read_repo_context
+from apex.core.memory import EventMemory
 from tests.helpers import init_repo
 
 
@@ -51,6 +52,29 @@ class PlannerTests(unittest.TestCase):
             self.assertIn("module.py", prompt)
             self.assertIn("Required JSON schema shape", prompt)
             self.assertIn("Shell commands are allowed only as verification_command", prompt)
+
+    def test_prompt_includes_recent_memory_events(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            memory = EventMemory(root / "memory" / "events.jsonl")
+            memory.append("plan_generated", {
+                "title": "Add insights module",
+                "target": "apex/core/insights.py",
+                "operation_count": 2,
+            })
+            memory.append("cycle_finished", {
+                "title": "Add insights module",
+                "accepted": False,
+                "reason": "empty_git_diff",
+            })
+            context = read_repo_context(root)
+
+            prompt = build_planner_prompt(context, "Improve planning", memory.read_recent())
+
+            self.assertIn("Recent memory events:", prompt)
+            self.assertIn("Add insights module", prompt)
+            self.assertIn("empty_git_diff", prompt)
 
     def test_ollama_planner_parses_strict_change_plan(self):
         plan_json = {
