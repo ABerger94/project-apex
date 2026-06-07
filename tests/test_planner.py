@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 
 from apex.core.planner import OllamaPlanner, build_goal_suggestion_prompt, build_planner_prompt, parse_planner_json
@@ -37,6 +38,11 @@ class FakeTransport:
 class TimeoutTransport(FakeTransport):
     def generate(self, endpoint, payload, headers, timeout_seconds):
         raise TimeoutError("timed out")
+
+
+class RateLimitedTransport(FakeTransport):
+    def generate(self, endpoint, payload, headers, timeout_seconds):
+        raise urllib.error.HTTPError(endpoint, 429, "Too Many Requests", {"Retry-After": "60"}, None)
 
 
 class PlannerTests(unittest.TestCase):
@@ -283,6 +289,20 @@ class PlannerTests(unittest.TestCase):
             )
 
             with self.assertRaisesRegex(ValueError, "Ollama planner timed out after 1s"):
+                planner.propose(root, "Make a plan")
+
+    def test_ollama_planner_reports_rate_limit_with_retry_guidance(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            planner = OllamaPlanner(
+                model="minimax-m3",
+                endpoint="https://ollama.com/api/generate",
+                api_key="secret",
+                transport=RateLimitedTransport({"response": "{}"}),
+            )
+
+            with self.assertRaisesRegex(ValueError, "rate limited.*Retry after 60 seconds"):
                 planner.propose(root, "Make a plan")
 
     def test_ollama_planner_keeps_cloud_model_on_local_endpoint(self):

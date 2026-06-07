@@ -111,6 +111,8 @@ class OllamaPlanner:
             raise ValueError(self._timeout_message()) from error
         except socket.timeout as error:
             raise ValueError(self._timeout_message()) from error
+        except urllib.error.HTTPError as error:
+            raise ValueError(self._http_error_message(error)) from error
         content = raw.get("response")
         if not isinstance(content, str) or not content.strip():
             raise ValueError("Ollama planner response did not include JSON text")
@@ -136,6 +138,17 @@ class OllamaPlanner:
             f"using model {self._resolved_model()} at {self.endpoint}. "
             "Try again, reduce the goal scope, or increase OLLAMA_TIMEOUT_SECONDS."
         )
+
+    def _http_error_message(self, error: urllib.error.HTTPError) -> str:
+        if error.code == 429:
+            retry_after = error.headers.get("Retry-After") if error.headers else None
+            retry_detail = f" Retry after {retry_after} seconds." if retry_after else ""
+            return (
+                f"Ollama planner was rate limited by {self.endpoint} using model {self._resolved_model()}."
+                f"{retry_detail} Wait before generating another plan, reduce repeated requests, or switch to "
+                "a local Ollama endpoint by clearing OLLAMA_API_ENDPOINT and using a local model."
+            )
+        return f"Ollama planner HTTP error {error.code} from {self.endpoint}: {error.reason}"
 
     def _resolved_model(self) -> str:
         if not self._is_local_endpoint():
