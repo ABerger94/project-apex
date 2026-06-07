@@ -44,6 +44,35 @@
         <div id="levelList" class="level-list"></div>
       </section>
 
+      <section class="panel command-panel">
+        <div class="panel-head">
+          <h2>Cycle Command</h2>
+          <span id="phaseLabel" class="muted">Idle</span>
+        </div>
+        <div class="command-grid">
+          <div class="workflow-wheel" aria-label="Manual cycle workflow">
+            <div class="phase-node" data-phase="context-intake"><span>1</span><strong>Context</strong></div>
+            <div class="phase-node" data-phase="self-read"><span>2</span><strong>Self-Read</strong></div>
+            <div class="phase-node" data-phase="plan-proposal"><span>3</span><strong>Plan</strong></div>
+            <div class="phase-node" data-phase="human-review"><span>4</span><strong>Review</strong></div>
+            <div class="phase-node" data-phase="execute"><span>5</span><strong>Execute</strong></div>
+            <div class="phase-node" data-phase="test"><span>6</span><strong>Test</strong></div>
+            <div class="phase-node" data-phase="commit-or-rollback"><span>7</span><strong>Commit/Rollback</strong></div>
+          </div>
+          <div class="manual-controls">
+            <label for="goalInput">Cycle Goal</label>
+            <textarea id="goalInput" rows="4" placeholder="Describe the single highest-leverage improvement to plan."></textarea>
+            <div class="button-row">
+              <button id="generatePlanBtn" type="button">Generate Plan</button>
+              <button id="runPlanBtn" type="button" disabled>Approve / Run</button>
+              <button id="clearPlanBtn" class="secondary" type="button" disabled>Clear</button>
+            </div>
+            <p id="commandMessage" class="muted"></p>
+            <div id="pendingPlan" class="pending-plan"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="layout">
         <div class="main-column">
           <section class="panel">
@@ -83,4 +112,3 @@
     <script src="/app.js"></script>
   </body>
 </html>
-

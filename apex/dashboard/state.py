@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
 from pathlib import Path
 
@@ -28,6 +29,7 @@ def dashboard_state(root: Path, event_limit: int = 80) -> dict:
         },
         "events": events,
         "cycles": summarize_cycles(events),
+        "pending_plan": read_pending_plan(root),
         "generated_from": "memory/events.jsonl",
     }
 
@@ -58,3 +60,15 @@ def summarize_cycles(events: list[dict]) -> list[dict]:
 def recent_git_commits(root: Path, limit: int = 12) -> list[str]:
     return GitOps(root).recent_commits(limit=limit)
 
+
+def read_pending_plan(root: Path) -> dict | None:
+    path = root / "memory" / "pending_plan.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"error": "pending_plan.json is not valid JSON"}
+    if not isinstance(data, dict):
+        return {"error": "pending_plan.json must contain an object"}
+    return data

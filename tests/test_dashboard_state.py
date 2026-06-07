@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from apex.core.memory import EventMemory
@@ -50,7 +51,25 @@ class DashboardStateTests(unittest.TestCase):
             self.assertEqual(len(state["events"]), 2)
             self.assertEqual(state["cycles"][0]["reason"], "verification_failed")
 
+    def test_dashboard_state_includes_pending_plan(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            pending_path = root / "memory" / "pending_plan.json"
+            pending_path.parent.mkdir(parents=True, exist_ok=True)
+            pending_path.write_text(json.dumps({
+                "goal": "Improve verification",
+                "plan": {
+                    "title": "Tighten verifier",
+                    "operations": [],
+                },
+            }), encoding="utf-8")
+
+            state = dashboard_state(root)
+
+            self.assertEqual(state["pending_plan"]["goal"], "Improve verification")
+            self.assertEqual(state["pending_plan"]["plan"]["title"], "Tighten verifier")
+
 
 if __name__ == "__main__":
     unittest.main()
-

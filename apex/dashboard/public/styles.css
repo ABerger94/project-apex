@@ -34,6 +34,17 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+button.secondary {
+  border-color: var(--line);
+  background: #17202a;
+  color: var(--ink);
+}
+
 .shell {
   width: min(1440px, calc(100vw - 32px));
   margin: 0 auto;
@@ -117,6 +128,193 @@ h2 {
 
 .objective-panel {
   margin-bottom: 14px;
+}
+
+.command-panel {
+  margin-bottom: 14px;
+}
+
+.command-grid {
+  display: grid;
+  grid-template-columns: 430px minmax(0, 1fr);
+  gap: 18px;
+  padding: 16px;
+}
+
+.workflow-wheel {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, var(--surface) 0 38%, transparent 39%),
+    conic-gradient(from -90deg, #46b3a7 0 14%, #d79b42 14% 28%, #5e8fd6 28% 42%, #b989d6 42% 56%, #d86c6c 56% 70%, #8bbf5a 70% 84%, #d6c15e 84% 100%);
+}
+
+.workflow-wheel::after {
+  content: "manual cycle";
+  position: absolute;
+  inset: 37%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.phase-node {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  width: 118px;
+  min-height: 62px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111923;
+  color: var(--muted);
+  padding: 8px;
+  text-align: center;
+  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.phase-node span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #202b36;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.phase-node strong {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.phase-node.active {
+  z-index: 2;
+  border-color: var(--accent);
+  color: var(--ink);
+  transform: scale(1.04);
+  box-shadow: 0 0 0 3px rgba(70, 179, 167, 0.18);
+}
+
+.phase-node.complete {
+  border-color: #8bbf5a;
+  color: var(--ink);
+}
+
+.phase-node[data-phase="context-intake"] {
+  left: calc(50% - 59px);
+  top: -6px;
+}
+
+.phase-node[data-phase="self-read"] {
+  right: 6px;
+  top: 60px;
+}
+
+.phase-node[data-phase="plan-proposal"] {
+  right: -6px;
+  top: calc(50% - 31px);
+}
+
+.phase-node[data-phase="human-review"] {
+  right: 44px;
+  bottom: 30px;
+}
+
+.phase-node[data-phase="execute"] {
+  left: 44px;
+  bottom: 30px;
+}
+
+.phase-node[data-phase="test"] {
+  left: -6px;
+  top: calc(50% - 31px);
+}
+
+.phase-node[data-phase="commit-or-rollback"] {
+  left: 6px;
+  top: 60px;
+}
+
+.manual-controls {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.manual-controls label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 110px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.45;
+  padding: 10px;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pending-plan {
+  display: grid;
+  gap: 10px;
+  min-height: 90px;
+}
+
+.pending-plan article {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.pending-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pending-plan pre {
+  max-height: 320px;
+  overflow: auto;
+  margin: 12px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #080c11;
+  color: var(--muted);
+  padding: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.error {
+  color: var(--bad);
 }
 
 #objectiveText {
@@ -255,8 +453,14 @@ pre.status {
 
 @media (max-width: 900px) {
   .metrics,
-  .layout {
+  .layout,
+  .command-grid {
     grid-template-columns: 1fr;
+  }
+
+  .workflow-wheel {
+    max-width: min(420px, calc(100vw - 64px));
+    margin: 0 auto;
   }
 
   .topbar {
@@ -264,4 +468,3 @@ pre.status {
     flex-direction: column;
   }
 }
-
