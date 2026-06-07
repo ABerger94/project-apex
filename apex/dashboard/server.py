@@ -72,7 +72,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 return
             memory = EventMemory(ROOT / "memory" / "events.jsonl")
             memory.append("plan_generation_started", {"goal": goal})
-            plan = OllamaPlanner().propose(ROOT, goal)
+            planner = OllamaPlanner()
+            memory.append("planner_selected", planner.diagnostic())
+            plan = planner.propose(ROOT, goal)
             payload = {"goal": goal, "plan": asdict(plan)}
             pending_path = ROOT / "memory" / "pending_plan.json"
             pending_path.parent.mkdir(parents=True, exist_ok=True)
@@ -85,7 +87,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             })
             self._send_json({"pending_plan": payload, "state": dashboard_state(ROOT)})
         except Exception as error:
-            EventMemory(ROOT / "memory" / "events.jsonl").append("plan_generation_failed", {"error": str(error)})
+            EventMemory(ROOT / "memory" / "events.jsonl").append("plan_generation_failed", {
+                "error": str(error),
+                "planner": OllamaPlanner().diagnostic(),
+            })
             self._send_json({"error": str(error)}, status=500)
 
     def _run_pending_plan(self) -> None:

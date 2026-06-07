@@ -43,6 +43,33 @@ A valid self-improvement cycle must:
 python -m unittest discover -s tests
 ```
 
+## Ollama Planner Setup
+
+APEX V2 defaults to the local Ollama API at `http://localhost:11434/api/generate` and the cloud model `minimax-m3:cloud`.
+
+For local Ollama cloud models, sign in once:
+
+```powershell
+ollama signin
+ollama run minimax-m3:cloud
+```
+
+For direct hosted Ollama API access, set these environment variables before starting the dashboard:
+
+```powershell
+$env:OLLAMA_API_KEY = "your_api_key"
+$env:OLLAMA_API_ENDPOINT = "https://ollama.com/api/generate"
+$env:OLLAMA_MODEL = "minimax-m3"
+```
+
+To persist them for future PowerShell sessions:
+
+```powershell
+[Environment]::SetEnvironmentVariable("OLLAMA_API_KEY", "your_api_key", "User")
+[Environment]::SetEnvironmentVariable("OLLAMA_API_ENDPOINT", "https://ollama.com/api/generate", "User")
+[Environment]::SetEnvironmentVariable("OLLAMA_MODEL", "minimax-m3", "User")
+```
+
 ## Current Core
 
 - `apex/core/plan_loader.py`: strict JSON plan loading.

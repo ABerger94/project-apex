@@ -7,6 +7,7 @@ from pathlib import Path
 from apex.core.context import read_repo_context
 from apex.core.git_ops import GitOps
 from apex.core.memory import EventMemory
+from apex.core.planner import OllamaPlanner
 from apex.objectives import AGI_LEVELS, TARGET_AGI_LEVEL, TARGET_OBJECTIVE
 
 
@@ -27,6 +28,7 @@ def dashboard_state(root: Path, event_limit: int = 80) -> dict:
             "tracked_file_count": len(context.tracked_files),
             "recent_commits": list(context.recent_commits),
         },
+        "planner": OllamaPlanner().diagnostic(),
         "events": events,
         "cycles": summarize_cycles(events),
         "pending_plan": read_pending_plan(root),

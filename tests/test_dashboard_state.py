@@ -2,6 +2,7 @@ import tempfile
 import unittest
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from apex.core.memory import EventMemory
 from apex.dashboard.state import dashboard_state, summarize_cycles
@@ -44,10 +45,16 @@ class DashboardStateTests(unittest.TestCase):
                 "changed_paths": ["module.py"],
             })
 
-            state = dashboard_state(root)
+            with patch.dict("os.environ", {
+                "OLLAMA_API_KEY": "",
+                "OLLAMA_API_ENDPOINT": "",
+                "OLLAMA_MODEL": "",
+            }):
+                state = dashboard_state(root)
 
             self.assertEqual(state["objective"]["target_level"], 5)
             self.assertEqual(state["repo"]["tracked_file_count"], 2)
+            self.assertEqual(state["planner"]["configured_model"], "minimax-m3:cloud")
             self.assertEqual(len(state["events"]), 2)
             self.assertEqual(state["cycles"][0]["reason"], "verification_failed")
 

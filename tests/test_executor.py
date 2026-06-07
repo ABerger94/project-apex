@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from apex.core.executor import AllowlistedExecutor
+from tests.helpers import init_repo
 
 
 class ExecutorTests(unittest.TestCase):
@@ -21,10 +22,19 @@ class ExecutorTests(unittest.TestCase):
             self.assertTrue(result.passed)
             self.assertIn("OK", result.stdout + result.stderr)
 
+    def test_runs_allowlisted_read_only_git_command(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+
+            result = AllowlistedExecutor(root).run(("git", "status", "--short"))
+
+            self.assertTrue(result.passed)
+
     def test_rejects_non_allowlisted_command(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             with self.assertRaises(ValueError):
-                AllowlistedExecutor(Path(temp_dir)).run(("git", "status"))
+                AllowlistedExecutor(Path(temp_dir)).run(("git", "reset", "--hard"))
 
 
 if __name__ == "__main__":

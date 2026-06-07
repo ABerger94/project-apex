@@ -9,8 +9,9 @@ from tests.helpers import init_repo
 
 
 class FakeTransport:
-    def __init__(self, response):
+    def __init__(self, response, models=None):
         self.response = response
+        self.models = models or []
         self.calls = []
 
     def generate(self, endpoint, payload, headers, timeout_seconds):
@@ -21,6 +22,15 @@ class FakeTransport:
             "timeout_seconds": timeout_seconds,
         })
         return self.response
+
+    def list_models(self, endpoint, timeout_seconds):
+        self.calls.append({
+            "endpoint": endpoint,
+            "payload": None,
+            "headers": {},
+            "timeout_seconds": timeout_seconds,
+        })
+        return self.models
 
 
 class PlannerTests(unittest.TestCase):
@@ -35,7 +45,7 @@ class PlannerTests(unittest.TestCase):
             self.assertIn("Level 5 AGI Organizer", prompt)
             self.assertIn("module.py", prompt)
             self.assertIn("Required JSON schema shape", prompt)
-            self.assertIn("Do not use shell commands", prompt)
+            self.assertIn("Shell commands are allowed only as verification_command", prompt)
 
     def test_ollama_planner_parses_strict_change_plan(self):
         plan_json = {
@@ -107,6 +117,61 @@ class PlannerTests(unittest.TestCase):
             planner.propose(root, "Improve test evidence")
 
             self.assertNotIn("Authorization", transport.calls[0]["headers"])
+
+    def test_ollama_planner_falls_back_to_installed_local_model(self):
+        plan_json = {
+            "title": "Improve smoke test",
+            "rationale": "Adds a concrete test improvement toward reliable verification.",
+            "target": "tests/test_smoke.py",
+            "operations": [
+                {
+                    "kind": "append_file",
+                    "path": "tests/test_smoke.py",
+                    "content": "\n# additional assertion\n",
+                }
+            ],
+            "verification_command": ["python", "-m", "unittest", "discover", "-s", "tests"],
+        }
+        transport = FakeTransport({"response": json.dumps(plan_json)}, models=["qwen3.6:latest"])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            planner = OllamaPlanner(
+                model="minimax-m3",
+                endpoint="http://localhost:11434/api/generate",
+                transport=transport,
+            )
+
+            planner.propose(root, "Improve test evidence")
+
+            generate_call = next(call for call in transport.calls if call["payload"])
+            self.assertEqual(generate_call["payload"]["model"], "qwen3.6:latest")
+
+    def test_ollama_planner_diagnostic_reports_model_resolution(self):
+        transport = FakeTransport({"response": "{}"}, models=["qwen3.6:latest"])
+        planner = OllamaPlanner(
+            model="minimax-m3",
+            endpoint="http://localhost:11434/api/generate",
+            transport=transport,
+        )
+
+        diagnostic = planner.diagnostic()
+
+        self.assertEqual(diagnostic["configured_model"], "minimax-m3")
+        self.assertEqual(diagnostic["resolved_model"], "qwen3.6:latest")
+        self.assertEqual(diagnostic["available_models"], ["qwen3.6:latest"])
+
+    def test_ollama_planner_keeps_cloud_model_on_local_endpoint(self):
+        transport = FakeTransport({"response": "{}"}, models=["qwen3.6:latest"])
+        planner = OllamaPlanner(
+            model="minimax-m3:cloud",
+            endpoint="http://localhost:11434/api/generate",
+            transport=transport,
+        )
+
+        diagnostic = planner.diagnostic()
+
+        self.assertEqual(diagnostic["resolved_model"], "minimax-m3:cloud")
 
     def test_ollama_planner_rejects_schema_invalid_plan(self):
         transport = FakeTransport({"response": json.dumps({"title": "No operations"})})

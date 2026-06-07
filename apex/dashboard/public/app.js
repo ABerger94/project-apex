@@ -22,6 +22,8 @@ const els = {
   branch: document.querySelector("#branch"),
   trackedFiles: document.querySelector("#trackedFiles"),
   workingTree: document.querySelector("#workingTree"),
+  plannerModel: document.querySelector("#plannerModel"),
+  plannerDetails: document.querySelector("#plannerDetails"),
   stateSource: document.querySelector("#stateSource"),
   objectiveText: document.querySelector("#objectiveText"),
   levelList: document.querySelector("#levelList"),
@@ -77,6 +79,22 @@ function renderRepo(repo, generatedFrom) {
   els.commits.innerHTML = repo.recent_commits.length
     ? repo.recent_commits.map((commit) => `<div class="commit">${escapeHtml(commit)}</div>`).join("")
     : `<p class="empty">No commits yet.</p>`;
+}
+
+function renderPlanner(planner) {
+  if (!planner) {
+    els.plannerModel.textContent = "--";
+    els.plannerDetails.innerHTML = "";
+    return;
+  }
+  els.plannerModel.textContent = planner.resolved_model || planner.configured_model || "--";
+  const available = planner.available_models?.length ? planner.available_models.join(", ") : "not listed";
+  els.plannerDetails.innerHTML = `
+    <div><dt>Endpoint</dt><dd>${escapeHtml(planner.endpoint || "--")}</dd></div>
+    <div><dt>Configured</dt><dd>${escapeHtml(planner.configured_model || "--")}</dd></div>
+    <div><dt>Resolved</dt><dd>${escapeHtml(planner.resolved_model || "--")}</dd></div>
+    <div><dt>Local Models</dt><dd>${escapeHtml(available)}</dd></div>
+  `;
 }
 
 function setActivePhase(phase) {
@@ -178,6 +196,7 @@ async function refresh() {
   const data = await response.json();
   renderObjective(data.objective);
   renderRepo(data.repo, data.generated_from);
+  renderPlanner(data.planner);
   renderPendingPlan(data.pending_plan);
   renderCycles(data.cycles || []);
   renderEvents(data.events || []);
@@ -215,6 +234,7 @@ async function generatePlan() {
     renderPendingPlan(data.pending_plan);
     renderObjective(data.state.objective);
     renderRepo(data.state.repo, data.state.generated_from);
+    renderPlanner(data.state.planner);
     renderCycles(data.state.cycles || []);
     renderEvents(data.state.events || []);
     setActivePhase("human-review");
@@ -237,6 +257,7 @@ async function runPendingPlan() {
     const data = await postJson("/api/run-pending-plan");
     renderPendingPlan(data.state.pending_plan);
     renderRepo(data.state.repo, data.state.generated_from);
+    renderPlanner(data.state.planner);
     renderCycles(data.state.cycles || []);
     renderEvents(data.state.events || []);
     setActivePhase("commit-or-rollback");

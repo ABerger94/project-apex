@@ -15,6 +15,14 @@ class AllowlistedExecutor:
         self.allowed_prefixes = allowed_prefixes or (
             ("python", "-m", "unittest"),
             ("python", "-m", "py_compile"),
+            ("python", "-m", "pytest"),
+            ("node", "--check"),
+            ("npm", "test"),
+            ("npm", "run", "test"),
+            ("npm", "run", "build"),
+            ("git", "status"),
+            ("git", "diff"),
+            ("git", "log"),
         )
 
     def run(self, command: tuple[str, ...], env: dict[str, str] | None = None) -> ExecutionResult:
