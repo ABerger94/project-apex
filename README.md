@@ -60,6 +60,7 @@ For direct hosted Ollama API access, set these environment variables before star
 $env:OLLAMA_API_KEY = "your_api_key"
 $env:OLLAMA_API_ENDPOINT = "https://ollama.com/api/generate"
 $env:OLLAMA_MODEL = "minimax-m3"
+$env:OLLAMA_TIMEOUT_SECONDS = "300"
 ```
 
 To persist them for future PowerShell sessions:
@@ -68,6 +69,7 @@ To persist them for future PowerShell sessions:
 [Environment]::SetEnvironmentVariable("OLLAMA_API_KEY", "your_api_key", "User")
 [Environment]::SetEnvironmentVariable("OLLAMA_API_ENDPOINT", "https://ollama.com/api/generate", "User")
 [Environment]::SetEnvironmentVariable("OLLAMA_MODEL", "minimax-m3", "User")
+[Environment]::SetEnvironmentVariable("OLLAMA_TIMEOUT_SECONDS", "300", "User")
 ```
 
 ## Current Core

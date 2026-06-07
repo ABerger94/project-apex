@@ -93,6 +93,7 @@ function renderPlanner(planner) {
     <div><dt>Endpoint</dt><dd>${escapeHtml(planner.endpoint || "--")}</dd></div>
     <div><dt>Configured</dt><dd>${escapeHtml(planner.configured_model || "--")}</dd></div>
     <div><dt>Resolved</dt><dd>${escapeHtml(planner.resolved_model || "--")}</dd></div>
+    <div><dt>Timeout</dt><dd>${escapeHtml(planner.timeout_seconds || "--")}s</dd></div>
     <div><dt>Local Models</dt><dd>${escapeHtml(available)}</dd></div>
   `;
 }

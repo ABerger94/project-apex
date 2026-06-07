@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import urllib.error
 import urllib.request
 from dataclasses import asdict
@@ -52,13 +53,13 @@ class OllamaPlanner:
         model: str | None = None,
         endpoint: str | None = None,
         api_key: str | None = None,
-        timeout_seconds: int = 120,
+        timeout_seconds: int | None = None,
         transport: PlannerTransport | None = None,
     ) -> None:
         self.model = model or os.getenv("OLLAMA_MODEL") or "minimax-m3:cloud"
         self.api_key = api_key if api_key is not None else os.getenv("OLLAMA_API_KEY")
         self.endpoint = endpoint or os.getenv("OLLAMA_API_ENDPOINT") or self._default_endpoint()
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = timeout_seconds or self._default_timeout_seconds()
         self.transport = transport or UrlLibTransport()
 
     def propose(self, root: Path, goal: str) -> ChangePlan:
@@ -75,7 +76,12 @@ class OllamaPlanner:
         headers = {"Content-Type": "application/json"}
         if self.api_key and self.endpoint.startswith("https://ollama.com/"):
             headers["Authorization"] = f"Bearer {self.api_key}"
-        raw = self.transport.generate(self.endpoint, payload, headers, self.timeout_seconds)
+        try:
+            raw = self.transport.generate(self.endpoint, payload, headers, self.timeout_seconds)
+        except TimeoutError as error:
+            raise ValueError(self._timeout_message()) from error
+        except socket.timeout as error:
+            raise ValueError(self._timeout_message()) from error
         content = raw.get("response")
         if not isinstance(content, str) or not content.strip():
             raise ValueError("Ollama planner response did not include JSON text")
@@ -87,6 +93,24 @@ class OllamaPlanner:
 
     def _default_endpoint(self) -> str:
         return "http://localhost:11434/api/generate"
+
+    def _default_timeout_seconds(self) -> int:
+        configured = os.getenv("OLLAMA_TIMEOUT_SECONDS")
+        if configured:
+            try:
+                return int(configured)
+            except ValueError:
+                return 300
+        if self.endpoint.startswith("https://ollama.com/"):
+            return 300
+        return 120
+
+    def _timeout_message(self) -> str:
+        return (
+            f"Ollama planner timed out after {self.timeout_seconds}s "
+            f"using model {self._resolved_model()} at {self.endpoint}. "
+            "Try again, reduce the goal scope, or increase OLLAMA_TIMEOUT_SECONDS."
+        )
 
     def _resolved_model(self) -> str:
         if not self._is_local_endpoint():
@@ -110,6 +134,7 @@ class OllamaPlanner:
             "endpoint": self.endpoint,
             "configured_model": self.model,
             "resolved_model": self._resolved_model(),
+            "timeout_seconds": self.timeout_seconds,
             "uses_api_key": bool(self.api_key and self.endpoint.startswith("https://ollama.com/")),
         }
         if self._is_local_endpoint():
@@ -122,8 +147,8 @@ class OllamaPlanner:
 
 
 def build_planner_prompt(context: RepoContext, goal: str) -> str:
-    files = "\n".join(f"- {path}" for path in context.tracked_files[:160])
-    commits = "\n".join(f"- {commit}" for commit in context.recent_commits[:8])
+    files = "\n".join(f"- {path}" for path in context.tracked_files[:80])
+    commits = "\n".join(f"- {commit}" for commit in context.recent_commits[:5])
     status = "\n".join(f"- {line}" for line in context.status) or "- clean"
     schema = {
         "title": "short concrete title",

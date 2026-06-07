@@ -33,6 +33,11 @@ class FakeTransport:
         return self.models
 
 
+class TimeoutTransport(FakeTransport):
+    def generate(self, endpoint, payload, headers, timeout_seconds):
+        raise TimeoutError("timed out")
+
+
 class PlannerTests(unittest.TestCase):
     def test_prompt_includes_level_5_objective_and_repo_context(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -160,6 +165,30 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(diagnostic["configured_model"], "minimax-m3")
         self.assertEqual(diagnostic["resolved_model"], "qwen3.6:latest")
         self.assertEqual(diagnostic["available_models"], ["qwen3.6:latest"])
+
+    def test_ollama_planner_uses_longer_default_timeout_for_hosted_api(self):
+        planner = OllamaPlanner(
+            endpoint="https://ollama.com/api/generate",
+            api_key="secret",
+            transport=FakeTransport({"response": "{}"}),
+        )
+
+        self.assertEqual(planner.diagnostic()["timeout_seconds"], 300)
+
+    def test_ollama_planner_reports_timeout_with_model_and_endpoint(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            init_repo(root)
+            planner = OllamaPlanner(
+                model="minimax-m3",
+                endpoint="https://ollama.com/api/generate",
+                api_key="secret",
+                timeout_seconds=1,
+                transport=TimeoutTransport({"response": "{}"}),
+            )
+
+            with self.assertRaisesRegex(ValueError, "Ollama planner timed out after 1s"):
+                planner.propose(root, "Make a plan")
 
     def test_ollama_planner_keeps_cloud_model_on_local_endpoint(self):
         transport = FakeTransport({"response": "{}"}, models=["qwen3.6:latest"])
